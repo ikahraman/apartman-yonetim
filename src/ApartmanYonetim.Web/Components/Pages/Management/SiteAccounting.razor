@@ -1,0 +1,162 @@
+@page "/site/{SiteId:guid}/muhasebe"
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@inject ISiteManagementService SiteService
+@inject ISiteAccountingService AccountingService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Muhasebe</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @if (_site is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
+                          UnitCount="@_site.UnitCount" ActiveRoute="muhasebe" />
+
+        <MudStack Row="true" Spacing="2" Class="mb-4" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <MudSelect @bind-Value="_year" Label="Yıl" Variant="Variant.Outlined" Dense="true" Style="max-width:100px">
+                <MudSelectItem Value="@((int?)null)">Tümü</MudSelectItem>
+                @for (int y = DateTime.Now.Year; y >= 2024; y--)
+                {
+                    var yr = y;
+                    <MudSelectItem Value="@((int?)yr)">@yr</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect @bind-Value="_month" Label="Ay" Variant="Variant.Outlined" Dense="true" Style="max-width:130px">
+                <MudSelectItem Value="@((int?)null)">Tümü</MudSelectItem>
+                @for (int m = 1; m <= 12; m++)
+                {
+                    var mo = m;
+                    <MudSelectItem Value="@((int?)mo)">@System.Globalization.CultureInfo.GetCultureInfo("tr-TR").DateTimeFormat.GetMonthName(mo)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton Variant="Variant.Outlined" OnClick="Reload" StartIcon="@Icons.Material.Filled.Search">Filtrele</MudButton>
+            <MudSpacer />
+            @if (!_readOnly)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">Kayıt Ekle</MudButton>
+            }
+        </MudStack>
+
+        @if (_summary is not null)
+        {
+            <MudGrid Spacing="2" Class="mb-4">
+                <MudItem xs="12" sm="4">
+                    <MudPaper Elevation="1" Class="pa-3">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Gelir</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Success" Style="font-weight:700">@_summary.TotalIncome.ToString("N0") ₺</MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudPaper Elevation="1" Class="pa-3">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Gider</MudText>
+                            <MudText Typo="Typo.h5" Color="Color.Error" Style="font-weight:700">@_summary.TotalExpense.ToString("N0") ₺</MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudPaper Elevation="1" Class="pa-3">
+                        <MudStack AlignItems="AlignItems.Center" Spacing="0">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Bakiye</MudText>
+                            <MudText Typo="Typo.h5" Color="@(_summary.Balance >= 0 ? Color.Success : Color.Error)" Style="font-weight:700">@_summary.Balance.ToString("N0") ₺</MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+
+        <MudTable T="AccountingEntryDto" Items="_entries" Dense="true" Hover="true" Elevation="1" SortLabel="Sırala">
+            <HeaderContent>
+                <MudTh>Tarih</MudTh>
+                <MudTh>Tür</MudTh>
+                <MudTh>Kategori</MudTh>
+                <MudTh>Açıklama</MudTh>
+                <MudTh>Tutar</MudTh>
+                <MudTh>Daire</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Date.ToString("dd.MM.yyyy")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Type == AccountingEntryType.Income ? Color.Success : Color.Error)">
+                        @(context.Type == AccountingEntryType.Income ? "Gelir" : "Gider")
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.Category</MudTd>
+                <MudTd>@context.Description</MudTd>
+                <MudTd Style="@(context.Type == AccountingEntryType.Income ? "color:var(--mud-palette-success)" : "color:var(--mud-palette-error)")">
+                    @(context.Type == AccountingEntryType.Income ? "+" : "-")@context.Amount.ToString("N0") ₺
+                </MudTd>
+                <MudTd>@(context.UnitNumber ?? "—")</MudTd>
+                <MudTd>
+                    @if (!_readOnly)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(context)" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+    [Parameter] public Guid SiteId { get; set; }
+    private SiteDto? _site;
+    private List<AccountingEntryDto> _entries = [];
+    private AccountingSummaryDto? _summary;
+    private int? _year = DateTime.Now.Year;
+    private int? _month;
+    private bool _readOnly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState;
+        _readOnly = auth.User.IsInRole("Auditor");
+        _site = await SiteService.GetByIdAsync(SiteId);
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        if (_site is null) return;
+        _entries = await AccountingService.GetAllAsync(_site.DbFilePath, _year, _month);
+        _summary = await AccountingService.GetSummaryAsync(_site.DbFilePath, _year, _month);
+    }
+
+    private string GetCurrentUser()
+    {
+        var auth = AuthProvider.GetAuthenticationStateAsync().Result;
+        return auth.User.FindFirst("DisplayName")?.Value ?? auth.User.Identity?.Name ?? "Yönetici";
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var p = new DialogParameters<AccountingEntryDialog>
+        {
+            { x => x.DbFilePath, _site!.DbFilePath },
+            { x => x.CreatedBy, GetCurrentUser() }
+        };
+        var dialog = await DialogService.ShowAsync<AccountingEntryDialog>("Kayıt Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task DeleteAsync(AccountingEntryDto entry)
+    {
+        try
+        {
+            await AccountingService.DeleteAsync(_site!.DbFilePath, entry.Id);
+            Snackbar.Add("Kayıt silindi.", Severity.Success);
+            await Reload();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

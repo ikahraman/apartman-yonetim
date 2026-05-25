@@ -1,0 +1,159 @@
+@page "/site/{SiteId:guid}/toplanti"
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@inject ISiteManagementService SiteService
+@inject ISiteMeetingService MeetingService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Toplantılar</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @if (_site is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
+                          UnitCount="@_site.UnitCount" ActiveRoute="toplanti" />
+
+        @if (!_readOnly)
+        {
+            <MudStack Row="true" Class="mb-4">
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">Toplantı Ekle</MudButton>
+            </MudStack>
+        }
+
+        <MudTable T="MeetingDto" Items="_meetings" Dense="true" Hover="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Başlık</MudTh>
+                <MudTh>Tür</MudTh>
+                <MudTh>Tarih</MudTh>
+                <MudTh>Yer</MudTh>
+                <MudTh>Durum</MudTh>
+                <MudTh>Tutanak</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudText Style="font-weight:500">@context.Title</MudText>
+                    @if (context.Description is not null)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
+                    }
+                </MudTd>
+                <MudTd>@MeetingTypeLabel(context.MeetingType)</MudTd>
+                <MudTd>@context.MeetingDate.ToString("dd.MM.yyyy HH:mm")</MudTd>
+                <MudTd>@(context.Location ?? "—")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@MeetingStatusColor(context.Status)">@MeetingStatusLabel(context.Status)</MudChip>
+                </MudTd>
+                <MudTd>
+                    @if (context.HasMinutes)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Description" Size="Size.Small" Color="Color.Primary" OnClick="() => OpenMinutesDialog(context)" />
+                    }
+                    else if (context.Status == MeetingStatus.Completed)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.AddCircleOutline" Size="Size.Small" Color="Color.Secondary" OnClick="() => OpenMinutesDialog(context)" />
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (!_readOnly)
+                    {
+                        <MudStack Row="true" Spacing="0">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="() => OpenEditDialog(context)" />
+                            @if (context.Status == MeetingStatus.Scheduled)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" OnClick="() => CompleteAsync(context)" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error" OnClick="() => CancelAsync(context)" />
+                            }
+                        </MudStack>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+    [Parameter] public Guid SiteId { get; set; }
+    private SiteDto? _site;
+    private List<MeetingDto> _meetings = [];
+    private bool _readOnly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState;
+        _readOnly = auth.User.IsInRole("Auditor");
+        _site = await SiteService.GetByIdAsync(SiteId);
+        await Reload();
+    }
+
+    private async Task Reload() { if (_site is not null) _meetings = await MeetingService.GetAllAsync(_site.DbFilePath); }
+
+    private string GetCurrentUser()
+    {
+        var auth = AuthProvider.GetAuthenticationStateAsync().Result;
+        return auth.User.FindFirst("DisplayName")?.Value ?? auth.User.Identity?.Name ?? "Yönetici";
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var p = new DialogParameters<MeetingFormDialog>
+        {
+            { x => x.DbFilePath, _site!.DbFilePath },
+            { x => x.CreatedBy, GetCurrentUser() }
+        };
+        var dialog = await DialogService.ShowAsync<MeetingFormDialog>("Toplantı Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenEditDialog(MeetingDto meeting)
+    {
+        var p = new DialogParameters<MeetingFormDialog>
+        {
+            { x => x.DbFilePath, _site!.DbFilePath },
+            { x => x.Meeting, meeting },
+            { x => x.CreatedBy, meeting.CreatedBy }
+        };
+        var dialog = await DialogService.ShowAsync<MeetingFormDialog>("Toplantı Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenMinutesDialog(MeetingDto meeting)
+    {
+        var p = new DialogParameters<MeetingMinutesDialog> { { x => x.DbFilePath, _site!.DbFilePath }, { x => x.Meeting, meeting } };
+        var dialog = await DialogService.ShowAsync<MeetingMinutesDialog>("Toplantı Tutanağı", p, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task CompleteAsync(MeetingDto m)
+    {
+        try
+        {
+            await MeetingService.UpdateStatusAsync(_site!.DbFilePath, m.Id, MeetingStatus.Completed);
+            Snackbar.Add("Toplantı tamamlandı.", Severity.Success);
+            await Reload();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task CancelAsync(MeetingDto m)
+    {
+        try
+        {
+            await MeetingService.UpdateStatusAsync(_site!.DbFilePath, m.Id, MeetingStatus.Cancelled);
+            Snackbar.Add("Toplantı iptal edildi.", Severity.Warning);
+            await Reload();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private static string MeetingTypeLabel(MeetingType t) => t switch { MeetingType.Ordinary => "Olağan", MeetingType.Extraordinary => "Olağanüstü", _ => "Acil" };
+    private static Color MeetingStatusColor(MeetingStatus s) => s switch { MeetingStatus.Scheduled => Color.Info, MeetingStatus.Completed => Color.Success, _ => Color.Default };
+    private static string MeetingStatusLabel(MeetingStatus s) => s switch { MeetingStatus.Scheduled => "Planlandı", MeetingStatus.Completed => "Tamamlandı", _ => "İptal" };
+}

@@ -1,0 +1,68 @@
+@page "/sakin/duyurular"
+@attribute [Authorize(Roles = "Resident")]
+@inject ISiteManagementService SiteService
+@inject ISiteResidentService ResidentService
+@inject ISiteAnnouncementService AnnouncementService
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Duyurular</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudButton Href="/sakin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">Portal</MudButton>
+        <MudText Typo="Typo.h5" Style="font-weight:700">Duyurular</MudText>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_announcements.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Aktif duyuru bulunmuyor.</MudAlert>
+    }
+    else
+    {
+        @foreach (var ann in _announcements)
+        {
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudStack Spacing="1">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        @if (ann.IsUrgent)
+                        {
+                            <MudChip T="string" Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Warning">Acil</MudChip>
+                        }
+                        <MudText Typo="Typo.h6" Style="font-weight:600">@ann.Title</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body1">@ann.Content</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @ann.PublishedAt.ToString("dd MMMM yyyy, HH:mm")
+                        @if (ann.ExpiresAt is not null) { <span> · Bitiş: @ann.ExpiresAt.Value.ToString("dd.MM.yyyy")</span> }
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private List<AnnouncementDto> _announcements = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var sites = await SiteService.GetAllAsync();
+        foreach (var site in sites)
+        {
+            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
+            if (r is not null)
+            {
+                _announcements = await AnnouncementService.GetActiveAsync(site.DbFilePath);
+                break;
+            }
+        }
+        _loading = false;
+    }
+}

@@ -1,0 +1,60 @@
+@inject ISiteManagementService SiteService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@UserDisplayName için erişilebilir siteler:</MudText>
+            @foreach (var site in _allSites)
+            {
+                var s = site;
+                <MudCheckBox T="bool" Value="@_selected.Contains(s.Id)"
+                             ValueChanged="@(v => Toggle(s.Id, v))"
+                             Label="@($"{s.Name} ({s.CompanyName})")" />
+            }
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string UserId { get; set; } = "";
+    [Parameter] public string UserDisplayName { get; set; } = "";
+
+    private List<SiteDto> _allSites = [];
+    private HashSet<Guid> _selected = [];
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allSites = await SiteService.GetAllAsync();
+        var current = await SiteService.GetUserSiteIdsAsync(UserId);
+        _selected = current.ToHashSet();
+    }
+
+    private void Toggle(Guid siteId, bool value)
+    {
+        if (value) _selected.Add(siteId);
+        else _selected.Remove(siteId);
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            await SiteService.SetUserSiteAccessAsync(UserId, _selected.ToList());
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

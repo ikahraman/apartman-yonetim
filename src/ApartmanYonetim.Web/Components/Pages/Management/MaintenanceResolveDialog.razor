@@ -1,0 +1,41 @@
+@inject ISiteMaintenanceService MaintenanceService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@Request.Title</MudText>
+            <MudTextField @bind-Value="_notes" Label="Çözüm Notları" Required="true" Variant="Variant.Outlined" Lines="3" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Çözüldü Olarak İşaretle
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public MaintenanceRequestDto Request { get; set; } = default!;
+
+    private string _notes = "";
+    private string? _error;
+    private bool _busy;
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_notes)) { _error = "Çözüm notu zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            await MaintenanceService.ResolveAsync(DbFilePath, Request.Id, _notes.Trim());
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

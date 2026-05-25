@@ -1,0 +1,219 @@
+@page "/site/{SiteId:guid}/aidatlar"
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@inject ISiteManagementService SiteService
+@inject ISiteFeeService FeeService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Aidatlar</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @if (_site is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
+                          UnitCount="@_site.UnitCount" ActiveRoute="aidatlar" />
+
+        <MudGrid Spacing="3">
+            <!-- Fee Schedules -->
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6" Style="font-weight:600">Aidat Tarifesi</MudText>
+                        <MudSpacer />
+                        @if (!_readOnly)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Small" OnClick="OpenAddScheduleDialog" />
+                        }
+                    </MudStack>
+                    @foreach (var s in _schedules)
+                    {
+                        var sch = s;
+                        <MudPaper Outlined="true" Class="pa-2 mb-2" Style="@(sch.IsActive ? "" : "opacity:0.6")">
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudStack Spacing="0">
+                                    <MudText Style="font-weight:500">@sch.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@sch.Amount.ToString("N0") ₺ · @PeriodLabel(sch.Period)</MudText>
+                                </MudStack>
+                                <MudSpacer />
+                                @if (!_readOnly)
+                                {
+                                    <MudStack Row="true" Spacing="0">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="() => OpenEditScheduleDialog(sch)" />
+                                        <MudSwitch T="bool" Value="sch.IsActive" Color="Color.Success" ValueChanged="v => ToggleActiveAsync(sch, v)" />
+                                    </MudStack>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                        @if (sch.Id == _selectedSchedule?.Id)
+                        {
+                            <MudChip T="string" Color="Color.Primary" Size="Size.Small" Class="mb-1">Seçili</MudChip>
+                        }
+                    }
+                    @if (!_schedules.Any())
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Henüz tarife yok.</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <!-- Payments Grid -->
+            <MudItem xs="12" md="8">
+                <MudPaper Elevation="1" Class="pa-3">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3" Wrap="Wrap.Wrap">
+                        <MudSelect @bind-Value="_selectedSchedule" Label="Tarife" Variant="Variant.Outlined" Dense="true" Style="max-width:200px"
+                                   ToStringFunc="@(s => s?.Name ?? "")">
+                            @foreach (var s in _schedules)
+                            {
+                                <MudSelectItem Value="s">@s.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect @bind-Value="_year" Label="Yıl" Variant="Variant.Outlined" Dense="true" Style="max-width:100px">
+                            @for (int y = DateTime.Now.Year; y >= 2024; y--)
+                            {
+                                var yr = y;
+                                <MudSelectItem Value="yr">@yr</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudSelect @bind-Value="_month" Label="Ay" Variant="Variant.Outlined" Dense="true" Style="max-width:130px">
+                            @for (int m = 1; m <= 12; m++)
+                            {
+                                var mo = m;
+                                <MudSelectItem Value="mo">@System.Globalization.CultureInfo.GetCultureInfo("tr-TR").DateTimeFormat.GetMonthName(mo)</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudButton Variant="Variant.Outlined" OnClick="LoadPayments" StartIcon="@Icons.Material.Filled.Search">Getir</MudButton>
+                        @if (!_readOnly)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.AutoFixHigh" OnClick="GenerateAsync">Tahakkuk Oluştur</MudButton>
+                        }
+                    </MudStack>
+
+                    @if (_summary is not null)
+                    {
+                        <MudStack Row="true" Spacing="2" Class="mb-3" Wrap="Wrap.Wrap">
+                            <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Tahsil: @_summary.Value.TotalCollected.ToString("N0") ₺</MudChip>
+                            <MudChip T="string" Color="Color.Warning" Icon="@Icons.Material.Filled.Pending">Bekleyen: @(_summary.Value.TotalExpected - _summary.Value.TotalCollected).ToString("N0") ₺</MudChip>
+                            <MudChip T="string" Color="Color.Info">@_summary.Value.PaidCount Ödendi / @_summary.Value.PendingCount Bekliyor</MudChip>
+                        </MudStack>
+                    }
+
+                    <MudTable T="FeePaymentDto" Items="_payments" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Daire</MudTh>
+                            <MudTh>Dönem</MudTh>
+                            <MudTh>Tutar</MudTh>
+                            <MudTh>Durum</MudTh>
+                            <MudTh>Ödeme Tarihi</MudTh>
+                            <MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@(context.UnitBlock is not null ? $"{context.UnitBlock}-" : "")@context.UnitNumber</MudTd>
+                            <MudTd>@context.PeriodLabel</MudTd>
+                            <MudTd>@context.Amount.ToString("N0") ₺</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small" Color="@PaymentColor(context.Status)">@PaymentLabel(context.Status)</MudChip>
+                            </MudTd>
+                            <MudTd>@(context.PaidDate?.ToString("dd.MM.yyyy") ?? "—")</MudTd>
+                            <MudTd>
+                                @if (!_readOnly && context.Status != FeePaymentStatus.Paid)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Payment" Size="Size.Small" Color="Color.Success"
+                                                   OnClick="() => OpenPaymentDialog(context)" />
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-3">Dönem seçip "Getir" butonuna tıklayın.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+    [Parameter] public Guid SiteId { get; set; }
+    private SiteDto? _site;
+    private List<FeeScheduleDto> _schedules = [];
+    private FeeScheduleDto? _selectedSchedule;
+    private List<FeePaymentDto> _payments = [];
+    private (decimal TotalExpected, decimal TotalCollected, int PaidCount, int PendingCount)? _summary;
+    private int _year = DateTime.Now.Year;
+    private int _month = DateTime.Now.Month;
+    private bool _readOnly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState;
+        _readOnly = auth.User.IsInRole("Auditor");
+        _site = await SiteService.GetByIdAsync(SiteId);
+        if (_site is not null)
+        {
+            _schedules = await FeeService.GetSchedulesAsync(_site.DbFilePath);
+            _selectedSchedule = _schedules.FirstOrDefault(s => s.IsActive) ?? _schedules.FirstOrDefault();
+        }
+    }
+
+    private async Task LoadPayments()
+    {
+        if (_site is null || _selectedSchedule is null) return;
+        _payments = await FeeService.GetPaymentsAsync(_site.DbFilePath, _selectedSchedule.Id, _year, _month);
+        _summary = await FeeService.GetMonthSummaryAsync(_site.DbFilePath, _selectedSchedule.Id, _year, _month);
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (_site is null || _selectedSchedule is null) return;
+        try
+        {
+            await FeeService.GeneratePaymentsForMonthAsync(_site.DbFilePath, _selectedSchedule.Id, _year, _month);
+            Snackbar.Add("Tahakkuklar oluşturuldu.", Severity.Success);
+            await LoadPayments();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private async Task ToggleActiveAsync(FeeScheduleDto sch, bool val)
+    {
+        await FeeService.SetScheduleActiveAsync(_site!.DbFilePath, sch.Id, val);
+        _schedules = await FeeService.GetSchedulesAsync(_site.DbFilePath);
+    }
+
+    private async Task OpenAddScheduleDialog()
+    {
+        var p = new DialogParameters<FeeScheduleDialog> { { x => x.DbFilePath, _site!.DbFilePath } };
+        var dialog = await DialogService.ShowAsync<FeeScheduleDialog>("Tarife Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled)
+        {
+            _schedules = await FeeService.GetSchedulesAsync(_site!.DbFilePath);
+            _selectedSchedule ??= _schedules.FirstOrDefault();
+        }
+    }
+
+    private async Task OpenEditScheduleDialog(FeeScheduleDto sch)
+    {
+        var p = new DialogParameters<FeeScheduleDialog> { { x => x.DbFilePath, _site!.DbFilePath }, { x => x.Schedule, sch } };
+        var dialog = await DialogService.ShowAsync<FeeScheduleDialog>("Tarife Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) _schedules = await FeeService.GetSchedulesAsync(_site!.DbFilePath);
+    }
+
+    private async Task OpenPaymentDialog(FeePaymentDto payment)
+    {
+        var p = new DialogParameters<RecordPaymentDialog> { { x => x.DbFilePath, _site!.DbFilePath }, { x => x.Payment, payment } };
+        var dialog = await DialogService.ShowAsync<RecordPaymentDialog>("Ödeme Kaydet", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await LoadPayments();
+    }
+
+    private static string PeriodLabel(FeePeriod p) => p switch { FeePeriod.Monthly => "Aylık", FeePeriod.Quarterly => "3 Aylık", FeePeriod.Yearly => "Yıllık", _ => "" };
+    private static Color PaymentColor(FeePaymentStatus s) => s switch { FeePaymentStatus.Paid => Color.Success, FeePaymentStatus.Overdue => Color.Error, _ => Color.Warning };
+    private static string PaymentLabel(FeePaymentStatus s) => s switch { FeePaymentStatus.Paid => "Ödendi", FeePaymentStatus.Overdue => "Gecikmiş", _ => "Bekliyor" };
+}

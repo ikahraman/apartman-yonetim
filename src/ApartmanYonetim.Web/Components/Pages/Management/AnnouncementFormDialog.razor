@@ -1,0 +1,61 @@
+@inject ISiteAnnouncementService AnnouncementService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_title" Label="Başlık" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_content" Label="İçerik" Required="true" Variant="Variant.Outlined" Lines="4" />
+            <MudSwitch @bind-Value="_isUrgent" Label="Acil duyuru" Color="Color.Error" />
+            <MudDatePicker @bind-Date="_expiresAt" Label="Bitiş Tarihi (opsiyonel)" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Clearable="true" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public AnnouncementDto? Announcement { get; set; }
+    [Parameter] public string CreatedBy { get; set; } = "";
+
+    private string _title = "";
+    private string _content = "";
+    private bool _isUrgent;
+    private DateTime? _expiresAt;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Announcement is not null)
+        {
+            _title = Announcement.Title;
+            _content = Announcement.Content;
+            _isUrgent = Announcement.IsUrgent;
+            _expiresAt = Announcement.ExpiresAt;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_title) || string.IsNullOrWhiteSpace(_content))
+        { _error = "Başlık ve içerik zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var cmd = new AnnouncementCommand(_title.Trim(), _content.Trim(), _isUrgent, _expiresAt);
+            if (Announcement is null) await AnnouncementService.AddAsync(DbFilePath, cmd, CreatedBy);
+            else await AnnouncementService.UpdateAsync(DbFilePath, Announcement.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

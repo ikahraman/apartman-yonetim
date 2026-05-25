@@ -1,0 +1,71 @@
+@inject ISiteMaintenanceService MaintenanceService
+@inject ISiteResidentService ResidentService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_title" Label="Başlık" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_description" Label="Açıklama" Variant="Variant.Outlined" Lines="3" />
+            <MudTextField @bind-Value="_category" Label="Kategori" Variant="Variant.Outlined" Placeholder="Elektrik, Su, Asansör..." />
+            <MudSelect @bind-Value="_priority" Label="Öncelik" Variant="Variant.Outlined">
+                <MudSelectItem Value="MaintenancePriority.Low">Düşük</MudSelectItem>
+                <MudSelectItem Value="MaintenancePriority.Normal">Normal</MudSelectItem>
+                <MudSelectItem Value="MaintenancePriority.High">Yüksek</MudSelectItem>
+                <MudSelectItem Value="MaintenancePriority.Urgent">Kritik</MudSelectItem>
+            </MudSelect>
+            <MudSelect @bind-Value="_selectedUnitId" Label="Daire (opsiyonel)" Variant="Variant.Outlined" Clearable="true"
+                       ToStringFunc="@(id => id == Guid.Empty ? "Ortak Alan" : (_units.FirstOrDefault(u => u.Id == id)?.Number ?? ""))">
+                @foreach (var u in _units)
+                {
+                    <MudSelectItem Value="u.Id">@u.Number @(u.Block is not null ? $"({u.Block})" : "")</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_reporterName" Label="Bildiren Adı" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_reporterPhone" Label="Bildiren Telefon" Variant="Variant.Outlined" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+
+    private string _title = "";
+    private string _description = "";
+    private string _category = "";
+    private MaintenancePriority _priority = MaintenancePriority.Normal;
+    private Guid _selectedUnitId = Guid.Empty;
+    private string? _reporterName;
+    private string? _reporterPhone;
+    private List<UnitSummaryDto> _units = [];
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _units = await ResidentService.GetUnitsAsync(DbFilePath);
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) { _error = "Başlık zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var unitId = _selectedUnitId == Guid.Empty ? (Guid?)null : _selectedUnitId;
+            var cmd = new MaintenanceFormCommand(unitId, _reporterName, _reporterPhone, _title.Trim(), _description, _category, _priority);
+            await MaintenanceService.AddAsync(DbFilePath, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

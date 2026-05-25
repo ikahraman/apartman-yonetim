@@ -1,0 +1,70 @@
+@inject ISiteAccountingService AccountingService
+@inject ISiteResidentService ResidentService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect @bind-Value="_type" Label="Tür" Variant="Variant.Outlined">
+                <MudSelectItem Value="AccountingEntryType.Income">Gelir</MudSelectItem>
+                <MudSelectItem Value="AccountingEntryType.Expense">Gider</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_category" Label="Kategori" Variant="Variant.Outlined" Placeholder="Aidat, Bakım, Temizlik..." />
+            <MudTextField @bind-Value="_description" Label="Açıklama" Required="true" Variant="Variant.Outlined" />
+            <MudNumericField @bind-Value="_amount" Label="Tutar (₺)" Required="true" Variant="Variant.Outlined" Min="0" />
+            <MudDatePicker @bind-Date="_date" Label="Tarih" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+            <MudSelect @bind-Value="_selectedUnitId" Label="Daire (opsiyonel)" Variant="Variant.Outlined" Clearable="true"
+                       ToStringFunc="@(id => id == Guid.Empty ? "" : (_units.FirstOrDefault(u => u.Id == id)?.Number ?? ""))">
+                @foreach (var u in _units)
+                {
+                    <MudSelectItem Value="u.Id">@u.Number @(u.Block is not null ? $"({u.Block})" : "")</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public string CreatedBy { get; set; } = "";
+
+    private AccountingEntryType _type = AccountingEntryType.Income;
+    private string _category = "";
+    private string _description = "";
+    private decimal _amount = 0;
+    private DateTime? _date = DateTime.Today;
+    private Guid _selectedUnitId = Guid.Empty;
+    private List<UnitSummaryDto> _units = [];
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _units = await ResidentService.GetUnitsAsync(DbFilePath);
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_description)) { _error = "Açıklama zorunludur."; return; }
+        if (_amount <= 0) { _error = "Tutar 0'dan büyük olmalıdır."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var unitId = _selectedUnitId == Guid.Empty ? (Guid?)null : _selectedUnitId;
+            var date = DateOnly.FromDateTime(_date ?? DateTime.Today);
+            var cmd = new AccountingCommand(_type, _category, _amount, date, _description.Trim(), unitId);
+            await AccountingService.AddAsync(DbFilePath, cmd, CreatedBy);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

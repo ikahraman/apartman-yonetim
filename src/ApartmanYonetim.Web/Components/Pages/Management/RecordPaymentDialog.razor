@@ -1,0 +1,50 @@
+@inject ISiteFeeService FeeService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                @Payment.UnitNumber — @Payment.PeriodLabel — Beklenen: @Payment.Amount.ToString("N0") ₺
+            </MudText>
+            <MudNumericField @bind-Value="_amount" Label="Ödenen Tutar (₺)" Required="true" Variant="Variant.Outlined" Min="0" />
+            <MudDatePicker @bind-Date="_paidDate" Label="Ödeme Tarihi" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+            <MudTextField @bind-Value="_notes" Label="Notlar" Variant="Variant.Outlined" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Ödemeyi Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public FeePaymentDto Payment { get; set; } = default!;
+
+    private decimal _amount;
+    private DateTime? _paidDate = DateTime.Today;
+    private string? _notes;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet() => _amount = Payment.Amount;
+
+    private async Task SubmitAsync()
+    {
+        if (_amount <= 0) { _error = "Tutar 0'dan büyük olmalıdır."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var date = DateOnly.FromDateTime(_paidDate ?? DateTime.Today);
+            await FeeService.RecordPaymentAsync(DbFilePath, Payment.Id, _amount, date, _notes);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

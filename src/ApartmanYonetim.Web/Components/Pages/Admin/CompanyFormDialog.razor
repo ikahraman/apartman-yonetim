@@ -1,0 +1,55 @@
+@inject IManagementCompanyService CompanyService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_name" Label="Firma Adı" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_slug" Label="Slug (URL)" Required="true" Variant="Variant.Outlined" HelperText="Küçük harf, tire ile — örn: abc-yonetim" />
+            <MudTextField @bind-Value="_email" Label="E-posta" Variant="Variant.Outlined" InputType="InputType.Email" />
+            <MudTextField @bind-Value="_phone" Label="Telefon" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_address" Label="Adres" Variant="Variant.Outlined" Lines="2" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public CompanyDto? Company { get; set; }
+
+    private string _name = "";
+    private string _slug = "";
+    private string? _email;
+    private string? _phone;
+    private string? _address;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Company is not null) { _name = Company.Name; _slug = Company.Slug; _email = Company.Email; _phone = Company.Phone; _address = Company.Address; }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_slug))
+        { _error = "Ad ve slug zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var cmd = new CompanyCommand(_name.Trim(), _slug.Trim().ToLower(), _email, _phone, _address);
+            if (Company is null) await CompanyService.CreateAsync(cmd);
+            else await CompanyService.UpdateAsync(Company.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

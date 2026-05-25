@@ -1,0 +1,125 @@
+@page "/admin/kullanicilar"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject UserManager<AppUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@inject ISiteManagementService SiteService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Kullanıcılar</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h5" Style="font-weight:600">Kullanıcılar</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="OpenAddDialog">Kullanıcı Ekle</MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudTable T="UserRowVm" Items="_users" Dense="true" Hover="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Ad Soyad</MudTh>
+                <MudTh>E-posta</MudTh>
+                <MudTh>Rol</MudTh>
+                <MudTh>Oluşturulma</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@(context.DisplayName ?? "—")</MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd>
+                    @foreach (var role in context.Roles)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="@(role == "SuperAdmin" ? Color.Error : Color.Primary)">@role</MudChip>
+                    }
+                </MudTd>
+                <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="0">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
+                        @if (context.Roles.Contains("SiteStaff") || context.Roles.Contains("Auditor"))
+                        {
+                            <MudTooltip Text="Site Erişimi">
+                                <MudIconButton Icon="@Icons.Material.Filled.AssignmentInd" Size="Size.Small" Color="Color.Secondary" OnClick="@(() => OpenSiteAssignmentDialog(context))" />
+                            </MudTooltip>
+                        }
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteAsync(context))" />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-3">Kullanıcı bulunamadı.</MudText>
+            </NoRecordsContent>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<UserRowVm> _users = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync() => await Reload();
+
+    private async Task Reload()
+    {
+        _loading = true;
+        var users = UserManager.Users.ToList();
+        var rows = new List<UserRowVm>();
+        foreach (var u in users)
+        {
+            var roles = await UserManager.GetRolesAsync(u);
+            rows.Add(new UserRowVm(u.Id, u.Email ?? "", u.DisplayName, roles.ToList(), u.CreatedAt));
+        }
+        _users = rows;
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var allRoles = RoleManager.Roles.Select(r => r.Name!).ToList();
+        var p = new DialogParameters<UserFormDialog> { { x => x.AllRoles, allRoles } };
+        var dialog = await DialogService.ShowAsync<UserFormDialog>("Kullanıcı Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenEditDialog(UserRowVm vm)
+    {
+        var user = await UserManager.FindByIdAsync(vm.Id);
+        if (user is null) return;
+        var allRoles = RoleManager.Roles.Select(r => r.Name!).ToList();
+        var p = new DialogParameters<UserFormDialog>
+        {
+            { x => x.User, user },
+            { x => x.CurrentRoles, vm.Roles },
+            { x => x.AllRoles, allRoles }
+        };
+        var dialog = await DialogService.ShowAsync<UserFormDialog>("Kullanıcı Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenSiteAssignmentDialog(UserRowVm vm)
+    {
+        var p = new DialogParameters<SiteAssignmentDialog>
+        {
+            { x => x.UserId, vm.Id },
+            { x => x.UserDisplayName, vm.DisplayName ?? vm.Email }
+        };
+        await DialogService.ShowAsync<SiteAssignmentDialog>("Site Erişimi", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+    }
+
+    private async Task DeleteAsync(UserRowVm vm)
+    {
+        var user = await UserManager.FindByIdAsync(vm.Id);
+        if (user is null) return;
+        var result = await UserManager.DeleteAsync(user);
+        if (result.Succeeded) { Snackbar.Add("Kullanıcı silindi.", Severity.Success); await Reload(); }
+        else Snackbar.Add(string.Join(", ", result.Errors.Select(e => e.Description)), Severity.Error);
+    }
+
+    private record UserRowVm(string Id, string Email, string? DisplayName, List<string> Roles, DateTime CreatedAt);
+}

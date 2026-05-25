@@ -1,0 +1,32 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Publish outputs (build artifacts - not in source control)
+publish_azure/
+publish_new/
+publish_out/
+publish_test/
+publish_output/
+
+## Deploy zips
+*.zip
+deploy_*.zip
+
+## SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
+## Secrets / env
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+.env
+
+## OS
+.DS_Store
+Thumbs.db

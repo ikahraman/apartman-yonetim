@@ -1,0 +1,62 @@
+@inject ISiteMeetingService MeetingService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">@Meeting.Title — @Meeting.MeetingDate.ToString("dd.MM.yyyy")</MudText>
+            @if (_existing is not null)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Son güncelleme: @_existing.CreatedAt.ToString("dd.MM.yyyy HH:mm")</MudText>
+            }
+            <MudNumericField @bind-Value="_attendeeCount" Label="Katılımcı Sayısı" Variant="Variant.Outlined" Min="0" />
+            <MudTextField @bind-Value="_content" Label="Tutanak İçeriği" Required="true" Variant="Variant.Outlined" Lines="6" />
+            <MudTextField @bind-Value="_decisions" Label="Alınan Kararlar" Variant="Variant.Outlined" Lines="4" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public MeetingDto Meeting { get; set; } = default!;
+
+    private MeetingMinutesDto? _existing;
+    private string _content = "";
+    private int _attendeeCount = 0;
+    private string? _decisions;
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _existing = await MeetingService.GetMinutesAsync(DbFilePath, Meeting.Id);
+        if (_existing is not null)
+        {
+            _content = _existing.Content;
+            _attendeeCount = _existing.AttendeeCount;
+            _decisions = _existing.Decisions;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_content)) { _error = "Tutanak içeriği zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var cmd = new MeetingMinutesCommand(_content.Trim(), _attendeeCount, _decisions);
+            await MeetingService.SaveMinutesAsync(DbFilePath, Meeting.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

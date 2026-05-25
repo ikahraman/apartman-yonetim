@@ -1,0 +1,61 @@
+@page "/admin/firmalar"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IManagementCompanyService CompanyService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Yönetim Firmaları</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h5" Style="font-weight:700">Yönetim Firmaları</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">Firma Ekle</MudButton>
+    </MudStack>
+
+    <MudTable T="CompanyDto" Items="_companies" Hover="true" Elevation="1">
+        <HeaderContent>
+            <MudTh>Firma Adı</MudTh>
+            <MudTh>Slug</MudTh>
+            <MudTh>E-posta</MudTh>
+            <MudTh>Telefon</MudTh>
+            <MudTh>Site Sayısı</MudTh>
+            <MudTh>Durum</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><MudText Style="font-weight:500">@context.Name</MudText></MudTd>
+            <MudTd><MudText Typo="Typo.caption">@context.Slug</MudText></MudTd>
+            <MudTd>@(context.Email ?? "—")</MudTd>
+            <MudTd>@(context.Phone ?? "—")</MudTd>
+            <MudTd>@context.SiteCount</MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                    @(context.IsActive ? "Aktif" : "Pasif")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="() => OpenEditDialog(context)" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+</MudContainer>
+
+@code {
+    private List<CompanyDto> _companies = [];
+
+    protected override async Task OnInitializedAsync() => _companies = await CompanyService.GetAllAsync();
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = await DialogService.ShowAsync<CompanyFormDialog>("Firma Ekle", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) _companies = await CompanyService.GetAllAsync();
+    }
+
+    private async Task OpenEditDialog(CompanyDto company)
+    {
+        var p = new DialogParameters<CompanyFormDialog> { { x => x.Company, company } };
+        var dialog = await DialogService.ShowAsync<CompanyFormDialog>("Firma Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) _companies = await CompanyService.GetAllAsync();
+    }
+}

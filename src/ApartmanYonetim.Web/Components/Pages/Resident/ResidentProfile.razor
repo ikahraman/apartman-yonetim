@@ -1,0 +1,138 @@
+@page "/sakin/profil"
+@attribute [Authorize(Roles = "Resident")]
+@inject ISiteManagementService SiteService
+@inject ISiteResidentService ResidentService
+@inject UserManager<AppUser> UserManager
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>Profilim</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudButton Href="/sakin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">Portal</MudButton>
+        <MudText Typo="Typo.h5" Style="font-weight:700">Profilim</MudText>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_resident is null)
+    {
+        <MudAlert Severity="Severity.Warning">Profil bilgisi yüklenemedi.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="1" Class="pa-4">
+            <MudStack Spacing="3">
+                <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                    <MudAvatar Color="Color.Primary" Style="width:64px;height:64px;font-size:1.5rem">
+                        @_resident.FirstName.First()@_resident.LastName.First()
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6" Style="font-weight:600">@_resident.FullName</MudText>
+                    <MudChip T="string" Color="Color.Primary" Size="Size.Small">
+                        @(_resident.ResidencyType == ApartmanYonetim.Domain.Enums.ResidencyType.Owner ? "Mal Sahibi" : _resident.ResidencyType == ApartmanYonetim.Domain.Enums.ResidencyType.Tenant ? "Kiracı" : "Aile Üyesi")
+                    </MudChip>
+                </MudStack>
+
+                <MudDivider />
+
+                <MudStack Spacing="2">
+                    @if (_resident.Phone is not null)
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Phone" Color="Color.Secondary" Size="Size.Small" />
+                            <MudText>@_resident.Phone</MudText>
+                        </MudStack>
+                    }
+                    @if (_resident.Email is not null)
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Secondary" Size="Size.Small" />
+                            <MudText>@_resident.Email</MudText>
+                        </MudStack>
+                    }
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Color="Color.Secondary" Size="Size.Small" />
+                        <MudText>Giriş: @_resident.MoveInDate.ToString("dd.MM.yyyy")</MudText>
+                    </MudStack>
+                    @if (_siteName is not null)
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Secondary" Size="Size.Small" />
+                            <MudText>@_siteName · Daire @_unitNumber</MudText>
+                        </MudStack>
+                    }
+                </MudStack>
+
+                <MudDivider />
+
+                <MudText Typo="Typo.subtitle1" Style="font-weight:600">Şifre Değiştir</MudText>
+                <MudTextField @bind-Value="_currentPassword" Label="Mevcut Şifre" InputType="InputType.Password" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_newPassword" Label="Yeni Şifre" InputType="InputType.Password" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_confirmPassword" Label="Yeni Şifre (Tekrar)" InputType="InputType.Password" Variant="Variant.Outlined" />
+                @if (_pwError is not null) { <MudAlert Severity="Severity.Error">@_pwError</MudAlert> }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ChangePasswordAsync" Disabled="_busy">Şifreyi Güncelle</MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private ResidentDto? _resident;
+    private string? _siteName;
+    private string? _unitNumber;
+    private string _currentPassword = "";
+    private string _newPassword = "";
+    private string _confirmPassword = "";
+    private string? _pwError;
+    private string? _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var sites = await SiteService.GetAllAsync();
+        foreach (var site in sites)
+        {
+            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, _userId);
+            if (r is not null)
+            {
+                _resident = r;
+                _siteName = site.Name;
+                var units = await ResidentService.GetUnitsAsync(site.DbFilePath);
+                _unitNumber = units.FirstOrDefault(u => u.Id == r.UnitId)?.Number;
+                break;
+            }
+        }
+        _loading = false;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_currentPassword) || string.IsNullOrWhiteSpace(_newPassword))
+        { _pwError = "Tüm alanlar zorunludur."; return; }
+        if (_newPassword != _confirmPassword)
+        { _pwError = "Yeni şifreler eşleşmiyor."; return; }
+        _busy = true; _pwError = null;
+        try
+        {
+            var user = await UserManager.FindByIdAsync(_userId!);
+            if (user is null) { _pwError = "Kullanıcı bulunamadı."; return; }
+            var result = await UserManager.ChangePasswordAsync(user, _currentPassword, _newPassword);
+            if (result.Succeeded)
+            {
+                Snackbar.Add("Şifreniz güncellendi.", Severity.Success);
+                _currentPassword = _newPassword = _confirmPassword = "";
+            }
+            else
+            {
+                _pwError = string.Join(", ", result.Errors.Select(e => e.Description));
+            }
+        }
+        finally { _busy = false; }
+    }
+}

@@ -1,0 +1,76 @@
+@inject ISiteMeetingService MeetingService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_title" Label="Başlık" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_description" Label="Açıklama" Variant="Variant.Outlined" Lines="2" />
+            <MudSelect @bind-Value="_meetingType" Label="Tür" Variant="Variant.Outlined">
+                <MudSelectItem Value="MeetingType.Ordinary">Olağan</MudSelectItem>
+                <MudSelectItem Value="MeetingType.Extraordinary">Olağanüstü</MudSelectItem>
+                <MudSelectItem Value="MeetingType.Emergency">Acil</MudSelectItem>
+            </MudSelect>
+            <MudDatePicker @bind-Date="_meetingDateOnly" Label="Toplantı Tarihi" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+            <MudTimePicker @bind-Time="_meetingTime" Label="Toplantı Saati" Variant="Variant.Outlined" AmPm="false" />
+            <MudTextField @bind-Value="_location" Label="Yer" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_agendaItems" Label="Gündem Maddeleri" Variant="Variant.Outlined" Lines="3" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public MeetingDto? Meeting { get; set; }
+    [Parameter] public string CreatedBy { get; set; } = "";
+
+    private string _title = "";
+    private string? _description;
+    private MeetingType _meetingType = MeetingType.Ordinary;
+    private DateTime? _meetingDateOnly = DateTime.Now.AddDays(7);
+    private TimeSpan? _meetingTime = new TimeSpan(19, 0, 0);
+    private string? _location;
+    private string? _agendaItems;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Meeting is not null)
+        {
+            _title = Meeting.Title;
+            _description = Meeting.Description;
+            _meetingType = Meeting.MeetingType;
+            _meetingDateOnly = Meeting.MeetingDate.Date;
+            _meetingTime = Meeting.MeetingDate.TimeOfDay;
+            _location = Meeting.Location;
+            _agendaItems = Meeting.AgendaItems;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) { _error = "Başlık zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var date = _meetingDateOnly ?? DateTime.Now.AddDays(7);
+            var time = _meetingTime ?? TimeSpan.Zero;
+            var meetingDate = date.Date.Add(time);
+            var cmd = new MeetingCommand(_title.Trim(), _description, meetingDate, _location, _meetingType, _agendaItems);
+            if (Meeting is null) await MeetingService.AddAsync(DbFilePath, cmd, CreatedBy);
+            else await MeetingService.UpdateAsync(DbFilePath, Meeting.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

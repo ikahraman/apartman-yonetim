@@ -1,0 +1,70 @@
+@page "/sakin/aidatlar"
+@attribute [Authorize(Roles = "Resident")]
+@inject ISiteManagementService SiteService
+@inject ISiteResidentService ResidentService
+@inject ISiteFeeService FeeService
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Aidatlarım</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudButton Href="/sakin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">Portal</MudButton>
+        <MudText Typo="Typo.h5" Style="font-weight:700">Aidatlarım</MudText>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_payments.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Aidat kaydı bulunamadı.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="FeePaymentDto" Items="_payments" Dense="true" Hover="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Dönem</MudTh>
+                <MudTh>Tutar</MudTh>
+                <MudTh>Son Ödeme</MudTh>
+                <MudTh>Durum</MudTh>
+                <MudTh>Ödeme Tarihi</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.PeriodLabel</MudTd>
+                <MudTd>@context.Amount.ToString("N0") ₺</MudTd>
+                <MudTd>@context.DueDate.ToString("dd.MM.yyyy")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@PaymentColor(context.Status)">@PaymentLabel(context.Status)</MudChip>
+                </MudTd>
+                <MudTd>@(context.PaidDate?.ToString("dd.MM.yyyy") ?? "—")</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private List<FeePaymentDto> _payments = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var sites = await SiteService.GetAllAsync();
+        foreach (var site in sites)
+        {
+            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
+            if (r is not null)
+            {
+                _payments = await FeeService.GetPaymentsByUnitAsync(site.DbFilePath, r.UnitId, 24);
+                break;
+            }
+        }
+        _loading = false;
+    }
+
+    private static Color PaymentColor(FeePaymentStatus s) => s switch { FeePaymentStatus.Paid => Color.Success, FeePaymentStatus.Overdue => Color.Error, _ => Color.Warning };
+    private static string PaymentLabel(FeePaymentStatus s) => s switch { FeePaymentStatus.Paid => "Ödendi", FeePaymentStatus.Overdue => "Gecikmiş", _ => "Bekliyor" };
+}

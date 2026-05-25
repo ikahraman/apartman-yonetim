@@ -1,0 +1,137 @@
+@page "/site/{SiteId:guid}/arizalar"
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@inject ISiteManagementService SiteService
+@inject ISiteMaintenanceService MaintenanceService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Arızalar</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @if (_site is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
+                          UnitCount="@_site.UnitCount" ActiveRoute="arizalar" />
+
+        @if (_summary is not null)
+        {
+            <MudStack Row="true" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+                <MudChip T="string" Color="Color.Error" Icon="@Icons.Material.Filled.ErrorOutline">@_summary.Value.Open Açık</MudChip>
+                <MudChip T="string" Color="Color.Warning" Icon="@Icons.Material.Filled.Engineering">@_summary.Value.InProgress İşlemde</MudChip>
+                <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">@_summary.Value.Resolved Çözüldü</MudChip>
+                <MudSpacer />
+                @if (!_readOnly)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">Arıza Bildir</MudButton>
+                }
+            </MudStack>
+        }
+
+        <MudStack Row="true" Spacing="2" Class="mb-3" Wrap="Wrap.Wrap">
+            <MudChip T="MaintenanceStatus?" Color="@(_statusFilter is null ? Color.Primary : Color.Default)" OnClick="() => SetFilter(null)">Tümü</MudChip>
+            <MudChip T="MaintenanceStatus?" Color="@(_statusFilter == MaintenanceStatus.Open ? Color.Error : Color.Default)" OnClick="() => SetFilter(MaintenanceStatus.Open)">Açık</MudChip>
+            <MudChip T="MaintenanceStatus?" Color="@(_statusFilter == MaintenanceStatus.InProgress ? Color.Warning : Color.Default)" OnClick="() => SetFilter(MaintenanceStatus.InProgress)">İşlemde</MudChip>
+            <MudChip T="MaintenanceStatus?" Color="@(_statusFilter == MaintenanceStatus.Resolved ? Color.Success : Color.Default)" OnClick="() => SetFilter(MaintenanceStatus.Resolved)">Çözüldü</MudChip>
+        </MudStack>
+
+        <MudTable T="MaintenanceRequestDto" Items="_requests" Dense="true" Hover="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Başlık</MudTh>
+                <MudTh>Kategori</MudTh>
+                <MudTh>Daire</MudTh>
+                <MudTh>Öncelik</MudTh>
+                <MudTh>Durum</MudTh>
+                <MudTh>Tarih</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudText Style="font-weight:500">@context.Title</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@context.Description</MudText>
+                </MudTd>
+                <MudTd>@context.Category</MudTd>
+                <MudTd>@(context.UnitNumber ?? "Ortak Alan")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@PriorityColor(context.Priority)">@PriorityLabel(context.Priority)</MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@StatusColor(context.Status)">@StatusLabel(context.Status)</MudChip>
+                </MudTd>
+                <MudTd>@context.ReportedAt.ToString("dd.MM.yyyy")</MudTd>
+                <MudTd>
+                    @if (!_readOnly)
+                    {
+                        <MudStack Row="true" Spacing="0">
+                            @if (context.Status != MaintenanceStatus.Resolved)
+                            {
+                                <MudTooltip Text="Durumu güncelle">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="() => OpenUpdateStatusDialog(context)" />
+                                </MudTooltip>
+                                <MudTooltip Text="Çözüme kavuştur">
+                                    <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" OnClick="() => OpenResolveDialog(context)" />
+                                </MudTooltip>
+                            }
+                        </MudStack>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+    [Parameter] public Guid SiteId { get; set; }
+    private SiteDto? _site;
+    private List<MaintenanceRequestDto> _requests = [];
+    private (int Open, int InProgress, int Resolved)? _summary;
+    private MaintenanceStatus? _statusFilter;
+    private bool _readOnly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState;
+        _readOnly = auth.User.IsInRole("Auditor");
+        _site = await SiteService.GetByIdAsync(SiteId);
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        if (_site is null) return;
+        _requests = await MaintenanceService.GetAllAsync(_site.DbFilePath, _statusFilter);
+        _summary = await MaintenanceService.GetSummaryAsync(_site.DbFilePath);
+    }
+
+    private async Task SetFilter(MaintenanceStatus? status) { _statusFilter = status; await Reload(); }
+
+    private async Task OpenAddDialog()
+    {
+        var p = new DialogParameters<MaintenanceFormDialog> { { x => x.DbFilePath, _site!.DbFilePath } };
+        var dialog = await DialogService.ShowAsync<MaintenanceFormDialog>("Arıza Bildir", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenUpdateStatusDialog(MaintenanceRequestDto req)
+    {
+        var p = new DialogParameters<MaintenanceStatusDialog> { { x => x.DbFilePath, _site!.DbFilePath }, { x => x.Request, req } };
+        var dialog = await DialogService.ShowAsync<MaintenanceStatusDialog>("Durum Güncelle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenResolveDialog(MaintenanceRequestDto req)
+    {
+        var p = new DialogParameters<MaintenanceResolveDialog> { { x => x.DbFilePath, _site!.DbFilePath }, { x => x.Request, req } };
+        var dialog = await DialogService.ShowAsync<MaintenanceResolveDialog>("Arızayı Çöz", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private static Color PriorityColor(MaintenancePriority p) => p switch { MaintenancePriority.Urgent => Color.Error, MaintenancePriority.High => Color.Warning, MaintenancePriority.Low => Color.Default, _ => Color.Info };
+    private static string PriorityLabel(MaintenancePriority p) => p switch { MaintenancePriority.Urgent => "Kritik", MaintenancePriority.High => "Yüksek", MaintenancePriority.Low => "Düşük", _ => "Normal" };
+    private static Color StatusColor(MaintenanceStatus s) => s switch { MaintenanceStatus.Open => Color.Error, MaintenanceStatus.InProgress => Color.Warning, MaintenanceStatus.Resolved => Color.Success, _ => Color.Default };
+    private static string StatusLabel(MaintenanceStatus s) => s switch { MaintenanceStatus.Open => "Açık", MaintenanceStatus.InProgress => "İşlemde", MaintenanceStatus.Resolved => "Çözüldü", _ => "İptal" };
+}

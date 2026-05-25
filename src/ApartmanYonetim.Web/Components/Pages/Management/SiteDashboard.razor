@@ -1,0 +1,277 @@
+@page "/site/{SiteId:guid}/ozet"
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@inject ISiteManagementService SiteService
+@inject ISiteResidentService ResidentService
+@inject ISiteFeeService FeeService
+@inject ISiteMaintenanceService MaintenanceService
+@inject ISiteAccountingService AccountingService
+@inject ISiteAnnouncementService AnnouncementService
+@inject ISiteMeetingService MeetingService
+@inject NavigationManager Nav
+
+<PageTitle>Özet</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_site is not null)
+    {
+        <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
+                          UnitCount="@_site.UnitCount" ActiveRoute="ozet" />
+
+        <MudGrid Spacing="3" Class="mb-5">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/sakinler"))'>
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.Home" Color="Color.Primary" Size="Size.Small" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Doluluk Oranı</MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.h4" Style="font-weight:700">%@_occupancyRate</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_occupiedUnits / @_totalUnits daire dolu</MudText>
+                        <MudProgressLinear Value="@_occupancyRate" Color="Color.Primary" Rounded="true" Size="Size.Small" Class="mt-1" />
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/aidatlar"))'>
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Success" Size="Size.Small" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Bu Ay Tahsilat</MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.h4" Style="font-weight:700">%@_collectionRate</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_collectedAmount.ToString("N0") / @_expectedAmount.ToString("N0") ₺</MudText>
+                        <MudProgressLinear Value="@_collectionRate" Color="@(_collectionRate >= 80 ? Color.Success : Color.Warning)" Rounded="true" Size="Size.Small" Class="mt-1" />
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/arizalar"))'>
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.Build" Color="@(_openMaintenance + _inProgressMaintenance > 0 ? Color.Warning : Color.Success)" Size="Size.Small" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Açık Arıza / Talep</MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.h4" Style="font-weight:700">@(_openMaintenance + _inProgressMaintenance)</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_openMaintenance açık · @_inProgressMaintenance devam ediyor</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@_resolvedMaintenance çözüldü</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/muhasebe"))'>
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet"
+                                     Color="@(_balance >= 0 ? Color.Success : Color.Error)" Size="Size.Small" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Kasa (@DateTime.Now.Year)</MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.h4" Style="@($"font-weight:700;color:{(_balance >= 0 ? "inherit" : "var(--mud-palette-error)")}")">
+                            @_balance.ToString("N0") ₺
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Gelir @_totalIncome.ToString("N0") ₺</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Gider @_totalExpense.ToString("N0") ₺</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" md="5">
+                <MudPaper Elevation="1" Class="pa-4" Style="height:340px;overflow-y:auto">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Notifications" Size="Size.Small" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600">Son Duyurular</MudText>
+                        <MudSpacer />
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                   OnClick='@(() => Nav.NavigateTo($"/site/{SiteId}/duyurular"))'>Tümü</MudButton>
+                    </MudStack>
+                    @if (_recentAnnouncements.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Duyuru yok.</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="2">
+                            @foreach (var a in _recentAnnouncements)
+                            {
+                                <MudPaper Outlined="true" Class="px-3 py-2">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-1">
+                                        @if (a.IsUrgent)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Error" Style="height:18px;margin:0">Acil</MudChip>
+                                        }
+                                        <MudText Typo="Typo.body2" Style="font-weight:600">@a.Title</MudText>
+                                    </MudStack>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @a.PublishedAt.ToString("dd MMM yyyy", new System.Globalization.CultureInfo("tr-TR"))
+                                    </MudText>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="1" Class="pa-4" Style="height:340px;overflow-y:auto">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600">Yaklaşan Toplantılar</MudText>
+                        <MudSpacer />
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                   OnClick='@(() => Nav.NavigateTo($"/site/{SiteId}/toplanti"))'>Tümü</MudButton>
+                    </MudStack>
+                    @if (_upcomingMeetings.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Yaklaşan toplantı yok.</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Spacing="2">
+                            @foreach (var m in _upcomingMeetings)
+                            {
+                                <MudPaper Outlined="true" Class="px-3 py-2">
+                                    <MudText Typo="Typo.body2" Style="font-weight:600" Class="mb-1">@m.Title</MudText>
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @m.MeetingDate.ToString("dd MMM yyyy HH:mm", new System.Globalization.CultureInfo("tr-TR"))
+                                        </MudText>
+                                    </MudStack>
+                                    @if (m.Location is not null)
+                                    {
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mt-1">
+                                            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Color="Color.Secondary" />
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@m.Location</MudText>
+                                        </MudStack>
+                                    }
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="3">
+                <MudPaper Elevation="1" Class="pa-4" Style="height:340px">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Build" Size="Size.Small" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight:600">Arıza Durumu</MudText>
+                    </MudStack>
+                    <MudStack Spacing="2">
+                        <MudPaper Outlined="true" Class="px-3 py-2" Style="cursor:pointer"
+                                  @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/arizalar"))'>
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.FiberNew" Size="Size.Small" Color="Color.Error" Class="mr-2" />
+                                <MudText Typo="Typo.body2" Style="flex:1">Açık</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error" Style="height:22px;margin:0">@_openMaintenance</MudChip>
+                            </MudStack>
+                        </MudPaper>
+                        <MudPaper Outlined="true" Class="px-3 py-2" Style="cursor:pointer"
+                                  @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/arizalar"))'>
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Loop" Size="Size.Small" Color="Color.Warning" Class="mr-2" />
+                                <MudText Typo="Typo.body2" Style="flex:1">Devam Ediyor</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning" Style="height:22px;margin:0">@_inProgressMaintenance</MudChip>
+                            </MudStack>
+                        </MudPaper>
+                        <MudPaper Outlined="true" Class="px-3 py-2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" Class="mr-2" />
+                                <MudText Typo="Typo.body2" Style="flex:1">Çözüldü</MudText>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success" Style="height:22px;margin:0">@_resolvedMaintenance</MudChip>
+                            </MudStack>
+                        </MudPaper>
+                    </MudStack>
+
+                    @if (_site.ContractEndDate.HasValue)
+                    {
+                        var daysLeft = (_site.ContractEndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days;
+                        var contractColor = daysLeft < 30 ? Color.Error : daysLeft < 90 ? Color.Warning : Color.Success;
+                        <MudDivider Class="my-3" />
+                        <MudPaper Outlined="true" Class="px-3 py-2">
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Small" Color="@contractColor" Class="mr-2" />
+                                <MudStack Spacing="0" Style="flex:1">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Sözleşme Bitiş</MudText>
+                                    <MudText Typo="Typo.body2" Style="font-weight:600">
+                                        @_site.ContractEndDate.Value.ToString("dd.MM.yyyy")
+                                    </MudText>
+                                </MudStack>
+                                <MudChip T="string" Size="Size.Small" Color="@contractColor" Style="height:22px;margin:0">@daysLeft gün</MudChip>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public Guid SiteId { get; set; }
+
+    private SiteDto? _site;
+    private bool _loading = true;
+
+    private int _totalUnits, _occupiedUnits, _occupancyRate;
+    private decimal _expectedAmount, _collectedAmount;
+    private int _collectionRate;
+    private int _openMaintenance, _inProgressMaintenance, _resolvedMaintenance;
+    private decimal _totalIncome, _totalExpense, _balance;
+    private List<AnnouncementDto> _recentAnnouncements = [];
+    private List<MeetingDto> _upcomingMeetings = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _site = await SiteService.GetByIdAsync(SiteId);
+        if (_site is null) { _loading = false; return; }
+
+        var db = _site.DbFilePath;
+        var now = DateTime.Now;
+
+        var units = await ResidentService.GetUnitsAsync(db);
+        _totalUnits = units.Count;
+        _occupiedUnits = units.Count(u => u.OccupancyType != OccupancyType.Empty);
+        _occupancyRate = _totalUnits > 0 ? (int)Math.Round(_occupiedUnits * 100.0 / _totalUnits) : 0;
+
+        var schedules = await FeeService.GetSchedulesAsync(db);
+        foreach (var s in schedules.Where(s => s.IsActive))
+        {
+            var (exp, col, _, _) = await FeeService.GetMonthSummaryAsync(db, s.Id, now.Year, now.Month);
+            _expectedAmount += exp;
+            _collectedAmount += col;
+        }
+        _collectionRate = _expectedAmount > 0 ? (int)Math.Round((double)_collectedAmount / (double)_expectedAmount * 100) : 0;
+
+        var (open, inProg, resolved) = await MaintenanceService.GetSummaryAsync(db);
+        _openMaintenance = open;
+        _inProgressMaintenance = inProg;
+        _resolvedMaintenance = resolved;
+
+        var acc = await AccountingService.GetSummaryAsync(db, now.Year);
+        _totalIncome = acc.TotalIncome;
+        _totalExpense = acc.TotalExpense;
+        _balance = acc.Balance;
+
+        var allAnnouncements = await AnnouncementService.GetAllAsync(db);
+        _recentAnnouncements = allAnnouncements.OrderByDescending(a => a.PublishedAt).Take(5).ToList();
+
+        var allMeetings = await MeetingService.GetAllAsync(db);
+        _upcomingMeetings = allMeetings
+            .Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now)
+            .OrderBy(m => m.MeetingDate)
+            .Take(3)
+            .ToList();
+
+        _loading = false;
+    }
+}

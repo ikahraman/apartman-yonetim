@@ -1,0 +1,142 @@
+@page "/site/{SiteId:guid}/sakinler"
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@inject ISiteManagementService SiteService
+@inject ISiteResidentService ResidentService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Sakinler</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @if (_site is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
+                          UnitCount="@_site.UnitCount" ActiveRoute="sakinler" />
+
+        <MudStack Row="true" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+            <MudChip T="string" Icon="@Icons.Material.Filled.Home" Color="Color.Default">@_units.Count Daire</MudChip>
+            <MudChip T="string" Icon="@Icons.Material.Filled.People" Color="Color.Primary">@_units.Count(u => u.OccupancyType != OccupancyType.Empty) Dolu</MudChip>
+            <MudChip T="string" Icon="@Icons.Material.Filled.HolidayVillage" Color="Color.Success">@_units.Count(u => u.OccupancyType == OccupancyType.Owner) Mal Sahibi</MudChip>
+            <MudChip T="string" Icon="@Icons.Material.Filled.Key" Color="Color.Info">@_units.Count(u => u.OccupancyType == OccupancyType.Tenant) Kiracı</MudChip>
+            <MudSpacer />
+            @if (!_readOnly)
+            {
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddUnitDialog">Daire Ekle</MudButton>
+            }
+        </MudStack>
+
+        <MudTextField @bind-Value="_search" Placeholder="Daire veya sakin ara…"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      IconSize="Size.Small" Clearable="true" Immediate="true"
+                      Style="max-width:280px" Class="mb-3" />
+
+        <MudTable T="UnitSummaryDto" Items="Filtered" Dense="true" Hover="true" Elevation="1" RowsPerPage="50">
+            <HeaderContent>
+                <MudTh>Daire</MudTh>
+                <MudTh>Blok / Kat</MudTh>
+                <MudTh>Durum</MudTh>
+                <MudTh>Sakin</MudTh>
+                <MudTh>Telefon</MudTh>
+                <MudTh>Tür</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><MudText Style="font-weight:500">@context.Number</MudText></MudTd>
+                <MudTd>@(context.Block is not null ? context.Block : "")@(context.Floor is not null ? $" · {context.Floor}.kat" : "")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@OccupancyColor(context.OccupancyType)">
+                        @OccupancyLabel(context.OccupancyType)
+                    </MudChip>
+                </MudTd>
+                <MudTd>@(context.ResidentName ?? "—")</MudTd>
+                <MudTd>@(context.ResidentPhone ?? "—")</MudTd>
+                <MudTd>
+                    @if (context.ResidentId is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default">@ResidencyLabel(context.ResidencyType)</MudChip>
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (!_readOnly)
+                    {
+                        <MudStack Row="true" Spacing="0">
+                            <MudTooltip Text="Daire düzenle">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="() => OpenEditUnitDialog(context)" />
+                            </MudTooltip>
+                            <MudTooltip Text="Sakin ekle / değiştir">
+                                <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Small" Color="Color.Secondary" OnClick="() => OpenResidentDialog(context)" />
+                            </MudTooltip>
+                            @if (context.ResidentId is not null)
+                            {
+                                <MudTooltip Text="Çıkış yaptır">
+                                    <MudIconButton Icon="@Icons.Material.Filled.ExitToApp" Size="Size.Small" Color="Color.Warning" OnClick="() => MoveOutAsync(context)" />
+                                </MudTooltip>
+                            }
+                        </MudStack>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+    [Parameter] public Guid SiteId { get; set; }
+    private SiteDto? _site;
+    private List<UnitSummaryDto> _units = [];
+    private string _search = "";
+    private bool _readOnly;
+
+    private IEnumerable<UnitSummaryDto> Filtered => string.IsNullOrWhiteSpace(_search) ? _units
+        : _units.Where(u => u.Number.Contains(_search, StringComparison.OrdinalIgnoreCase)
+            || (u.Block ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase)
+            || (u.ResidentName ?? "").Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState;
+        _readOnly = auth.User.IsInRole("Auditor");
+        _site = await SiteService.GetByIdAsync(SiteId);
+        if (_site is not null) _units = await ResidentService.GetUnitsAsync(_site.DbFilePath);
+    }
+
+    private async Task Reload() { if (_site is not null) _units = await ResidentService.GetUnitsAsync(_site.DbFilePath); }
+
+    private async Task OpenAddUnitDialog()
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        var dialog = await DialogService.ShowAsync<UnitFormDialog>("Daire Ekle", options);
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenEditUnitDialog(UnitSummaryDto unit)
+    {
+        var p = new DialogParameters<UnitFormDialog> { { x => x.Unit, unit }, { x => x.DbFilePath, _site!.DbFilePath } };
+        var dialog = await DialogService.ShowAsync<UnitFormDialog>("Daire Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenResidentDialog(UnitSummaryDto unit)
+    {
+        var p = new DialogParameters<ResidentFormDialog> { { x => x.Unit, unit }, { x => x.DbFilePath, _site!.DbFilePath } };
+        var dialog = await DialogService.ShowAsync<ResidentFormDialog>(unit.ResidentId is null ? "Sakin Ekle" : "Sakin Güncelle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task MoveOutAsync(UnitSummaryDto unit)
+    {
+        if (_site is null || unit.ResidentId is null) return;
+        await ResidentService.MoveOutAsync(_site.DbFilePath, unit.ResidentId.Value, DateOnly.FromDateTime(DateTime.Today));
+        Snackbar.Add($"'{unit.ResidentName}' çıkış yapıldı.", Severity.Success);
+        await Reload();
+    }
+
+    private static Color OccupancyColor(OccupancyType t) => t switch { OccupancyType.Owner => Color.Success, OccupancyType.Tenant => Color.Info, _ => Color.Default };
+    private static string OccupancyLabel(OccupancyType t) => t switch { OccupancyType.Owner => "Sahip", OccupancyType.Tenant => "Kiracı", _ => "Boş" };
+    private static string ResidencyLabel(ResidencyType? t) => t switch { ResidencyType.Owner => "Mal Sahibi", ResidencyType.Tenant => "Kiracı", ResidencyType.Family => "Aile", _ => "" };
+}

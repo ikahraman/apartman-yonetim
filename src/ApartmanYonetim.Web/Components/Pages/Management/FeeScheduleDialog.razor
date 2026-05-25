@@ -1,0 +1,67 @@
+@inject ISiteFeeService FeeService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_name" Label="Tarife Adı" Required="true" Variant="Variant.Outlined" />
+            <MudNumericField @bind-Value="_amount" Label="Tutar (₺)" Required="true" Variant="Variant.Outlined" Min="0" />
+            <MudSelect @bind-Value="_period" Label="Dönem" Variant="Variant.Outlined">
+                <MudSelectItem Value="FeePeriod.Monthly">Aylık</MudSelectItem>
+                <MudSelectItem Value="FeePeriod.Quarterly">3 Aylık</MudSelectItem>
+                <MudSelectItem Value="FeePeriod.Yearly">Yıllık</MudSelectItem>
+            </MudSelect>
+            <MudNumericField @bind-Value="_dueDay" Label="Son Ödeme Günü" Variant="Variant.Outlined" Min="1" Max="28" />
+            <MudDatePicker @bind-Date="_startDate" Label="Başlangıç Tarihi" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public FeeScheduleDto? Schedule { get; set; }
+
+    private string _name = "";
+    private decimal _amount = 0;
+    private FeePeriod _period = FeePeriod.Monthly;
+    private int _dueDay = 10;
+    private DateTime? _startDate = new DateTime(DateTime.Now.Year, 1, 1);
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Schedule is not null)
+        {
+            _name = Schedule.Name;
+            _amount = Schedule.Amount;
+            _period = Schedule.Period;
+            _dueDay = Schedule.DueDay;
+            _startDate = Schedule.StartDate.ToDateTime(TimeOnly.MinValue);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) { _error = "Tarife adı zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var start = DateOnly.FromDateTime(_startDate ?? DateTime.Today);
+            var cmd = new FeeScheduleCommand(_name.Trim(), _amount, _period, _dueDay, start, null);
+            if (Schedule is null) await FeeService.AddScheduleAsync(DbFilePath, cmd);
+            else await FeeService.UpdateScheduleAsync(DbFilePath, Schedule.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

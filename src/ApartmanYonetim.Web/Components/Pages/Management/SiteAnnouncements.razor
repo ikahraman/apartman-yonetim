@@ -1,0 +1,127 @@
+@page "/site/{SiteId:guid}/duyurular"
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@inject ISiteManagementService SiteService
+@inject ISiteAnnouncementService AnnouncementService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Duyurular</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @if (_site is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
+                          UnitCount="@_site.UnitCount" ActiveRoute="duyurular" />
+
+        <MudStack Row="true" Spacing="2" Class="mb-4" AlignItems="AlignItems.Center">
+            <MudSwitch @bind-Value="_showAll" Label="Tüm duyurular" Color="Color.Primary" />
+            <MudSpacer />
+            @if (!_readOnly)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">Duyuru Ekle</MudButton>
+            }
+        </MudStack>
+
+        @foreach (var a in _announcements)
+        {
+            var ann = a;
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudStack Row="true" AlignItems="AlignItems.Start">
+                    <MudStack Spacing="1" Style="flex:1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            @if (ann.IsUrgent)
+                            {
+                                <MudChip T="string" Color="Color.Error" Size="Size.Small" Icon="@Icons.Material.Filled.Warning">Acil</MudChip>
+                            }
+                            <MudText Typo="Typo.h6" Style="font-weight:600">@ann.Title</MudText>
+                        </MudStack>
+                        <MudText Typo="Typo.body2">@ann.Content</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @ann.CreatedBy · @ann.PublishedAt.ToString("dd.MM.yyyy HH:mm")
+                            @if (ann.ExpiresAt is not null) { <span> · Bitiş: @ann.ExpiresAt.Value.ToString("dd.MM.yyyy")</span> }
+                        </MudText>
+                    </MudStack>
+                    @if (!_readOnly)
+                    {
+                        <MudStack Row="true" Spacing="0">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="() => OpenEditDialog(ann)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => DeleteAsync(ann)" />
+                        </MudStack>
+                    }
+                </MudStack>
+            </MudPaper>
+        }
+
+        @if (!_announcements.Any())
+        {
+            <MudAlert Severity="Severity.Info">Duyuru bulunamadı.</MudAlert>
+        }
+    }
+</MudContainer>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+    [Parameter] public Guid SiteId { get; set; }
+    private SiteDto? _site;
+    private List<AnnouncementDto> _announcements = [];
+    private bool _showAll;
+    private bool _readOnly;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState;
+        _readOnly = auth.User.IsInRole("Auditor");
+        _site = await SiteService.GetByIdAsync(SiteId);
+        await Reload();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_site is not null) await Reload();
+    }
+
+    private async Task Reload()
+    {
+        if (_site is null) return;
+        _announcements = _showAll
+            ? await AnnouncementService.GetAllAsync(_site.DbFilePath)
+            : await AnnouncementService.GetActiveAsync(_site.DbFilePath);
+    }
+
+    private string GetCurrentUser()
+    {
+        var auth = AuthProvider.GetAuthenticationStateAsync().Result;
+        return auth.User.FindFirst("DisplayName")?.Value ?? auth.User.Identity?.Name ?? "Yönetici";
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var p = new DialogParameters<AnnouncementFormDialog> { { x => x.DbFilePath, _site!.DbFilePath }, { x => x.CreatedBy, GetCurrentUser() } };
+        var dialog = await DialogService.ShowAsync<AnnouncementFormDialog>("Duyuru Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenEditDialog(AnnouncementDto ann)
+    {
+        var p = new DialogParameters<AnnouncementFormDialog>
+        {
+            { x => x.DbFilePath, _site!.DbFilePath },
+            { x => x.Announcement, ann },
+            { x => x.CreatedBy, ann.CreatedBy }
+        };
+        var dialog = await DialogService.ShowAsync<AnnouncementFormDialog>("Duyuru Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task DeleteAsync(AnnouncementDto ann)
+    {
+        await AnnouncementService.DeleteAsync(_site!.DbFilePath, ann.Id);
+        Snackbar.Add("Duyuru silindi.", Severity.Success);
+        await Reload();
+    }
+}

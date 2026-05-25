@@ -1,0 +1,83 @@
+@inject UserManager<AppUser> UserManager
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_displayName" Label="Ad Soyad" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_email" Label="E-posta" Required="true" Variant="Variant.Outlined" InputType="InputType.Email" Disabled="@(User is not null)" />
+            @if (User is null)
+            {
+                <MudTextField @bind-Value="_password" Label="Şifre" Required="true" Variant="Variant.Outlined" InputType="InputType.Password" />
+            }
+            <MudSelect T="string" @bind-SelectedValues="_selectedRoles" Label="Roller" Variant="Variant.Outlined" MultiSelection="true">
+                @foreach (var role in AllRoles)
+                {
+                    <MudSelectItem T="string" Value="role">@role</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public AppUser? User { get; set; }
+    [Parameter] public List<string> CurrentRoles { get; set; } = [];
+    [Parameter] public List<string> AllRoles { get; set; } = [];
+
+    private string _displayName = "";
+    private string _email = "";
+    private string _password = "";
+    private IReadOnlyCollection<string> _selectedRoles = [];
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (User is not null)
+        {
+            _displayName = User.DisplayName ?? "";
+            _email = User.Email ?? "";
+            _selectedRoles = CurrentRoles.ToList();
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_email)) { _error = "E-posta zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            if (User is null)
+            {
+                if (string.IsNullOrWhiteSpace(_password)) { _error = "Şifre zorunludur."; _busy = false; return; }
+                var newUser = new AppUser { UserName = _email, Email = _email, DisplayName = _displayName.Trim(), EmailConfirmed = true };
+                var result = await UserManager.CreateAsync(newUser, _password);
+                if (!result.Succeeded) { _error = string.Join(", ", result.Errors.Select(e => e.Description)); _busy = false; return; }
+                if (_selectedRoles.Any())
+                    await UserManager.AddToRolesAsync(newUser, _selectedRoles);
+            }
+            else
+            {
+                User.DisplayName = _displayName.Trim();
+                await UserManager.UpdateAsync(User);
+                var currentRoles = await UserManager.GetRolesAsync(User);
+                var toAdd = _selectedRoles.Except(currentRoles).ToList();
+                var toRemove = currentRoles.Except(_selectedRoles).ToList();
+                if (toRemove.Any()) await UserManager.RemoveFromRolesAsync(User, toRemove);
+                if (toAdd.Any()) await UserManager.AddToRolesAsync(User, toAdd);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

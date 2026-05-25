@@ -1,0 +1,37 @@
+<MudNavMenu>
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Ana Sayfa</MudNavLink>
+
+            <AuthorizeView Roles="SuperAdmin,Manager,SiteStaff,Auditor" Context="_">
+                <MudDivider Class="my-2" />
+                <MudNavGroup Title="Yönetim" Icon="@Icons.Material.Filled.Apartment" Expanded="true">
+                    <MudNavLink Href="/sitelerim" Icon="@Icons.Material.Filled.Apartment">Sitelerim</MudNavLink>
+                </MudNavGroup>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="Resident" Context="_">
+                <MudDivider Class="my-2" />
+                <MudNavGroup Title="Sakin Portali" Icon="@Icons.Material.Filled.Home" Expanded="true">
+                    <MudNavLink Href="/sakin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Ana Sayfa</MudNavLink>
+                    <MudNavLink Href="/sakin/duyurular" Icon="@Icons.Material.Filled.Campaign">Duyurular</MudNavLink>
+                    <MudNavLink Href="/sakin/aidatlar" Icon="@Icons.Material.Filled.Receipt">Aidatlarım</MudNavLink>
+                    <MudNavLink Href="/sakin/talepler" Icon="@Icons.Material.Filled.Build">Bakım Taleplerim</MudNavLink>
+                    <MudNavLink Href="/sakin/profil" Icon="@Icons.Material.Filled.Person">Profilim</MudNavLink>
+                </MudNavGroup>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="SuperAdmin" Context="_">
+                <MudDivider Class="my-2" />
+                <MudNavGroup Title="Süper Admin" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="false">
+                    <MudNavLink Href="/admin/firmalar" Icon="@Icons.Material.Filled.Business">Firmalar</MudNavLink>
+                    <MudNavLink Href="/admin/siteler" Icon="@Icons.Material.Filled.Apartment">Tüm Siteler</MudNavLink>
+                    <MudNavLink Href="/admin/kullanicilar" Icon="@Icons.Material.Filled.People">Kullanıcılar</MudNavLink>
+                </MudNavGroup>
+            </AuthorizeView>
+        </Authorized>
+        <NotAuthorized>
+            <MudNavLink Href="/giris" Icon="@Icons.Material.Filled.Login">Giriş Yap</MudNavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudNavMenu>

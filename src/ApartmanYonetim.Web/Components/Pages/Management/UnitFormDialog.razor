@@ -1,0 +1,54 @@
+@inject ISiteResidentService ResidentService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_number" Label="Daire No" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_block" Label="Blok" Variant="Variant.Outlined" />
+            <MudNumericField @bind-Value="_floor" Label="Kat" Variant="Variant.Outlined" />
+            <MudNumericField @bind-Value="_sqm" Label="m²" Variant="Variant.Outlined" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public UnitSummaryDto? Unit { get; set; }
+
+    private string _number = "";
+    private string? _block;
+    private int? _floor;
+    private decimal? _sqm;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Unit is not null) { _number = Unit.Number; _block = Unit.Block; _floor = Unit.Floor; _sqm = Unit.SquareMeters; }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_number)) { _error = "Daire numarası zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var cmd = new AddUnitCommand(_number, _block, _floor, _sqm);
+            if (Unit is null) await ResidentService.AddUnitAsync(DbFilePath, cmd);
+            else await ResidentService.UpdateUnitAsync(DbFilePath, Unit.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

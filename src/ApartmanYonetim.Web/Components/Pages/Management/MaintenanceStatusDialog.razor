@@ -1,0 +1,53 @@
+@inject ISiteMaintenanceService MaintenanceService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@Request.Title</MudText>
+            <MudSelect @bind-Value="_status" Label="Durum" Variant="Variant.Outlined">
+                <MudSelectItem Value="MaintenanceStatus.Open">Açık</MudSelectItem>
+                <MudSelectItem Value="MaintenanceStatus.InProgress">İşlemde</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_assignedTo" Label="Atanan Kişi" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_notes" Label="Notlar" Variant="Variant.Outlined" Lines="2" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Güncelle
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+    [Parameter] public MaintenanceRequestDto Request { get; set; } = default!;
+
+    private MaintenanceStatus _status = MaintenanceStatus.InProgress;
+    private string? _assignedTo;
+    private string? _notes;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        _status = Request.Status;
+        _assignedTo = Request.AssignedTo;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            await MaintenanceService.UpdateStatusAsync(DbFilePath, Request.Id, _status, _assignedTo, _notes);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

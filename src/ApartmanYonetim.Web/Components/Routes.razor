@@ -1,0 +1,21 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated != true)
+                {
+                    <RedirectToLogin />
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Error">Bu sayfaya erişim yetkiniz yok.</MudAlert>
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Sayfa Bulunamadı</PageTitle>
+        <MudAlert Severity="Severity.Warning">İstediğiniz sayfa bulunamadı.</MudAlert>
+    </NotFound>
+</Router>

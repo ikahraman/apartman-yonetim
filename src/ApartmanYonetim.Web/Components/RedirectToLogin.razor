@@ -1,0 +1,10 @@
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToBaseRelativePath(Nav.Uri);
+        var returnUrl = Uri.EscapeDataString("/" + uri);
+        Nav.NavigateTo($"/giris?returnUrl={returnUrl}");
+    }
+}

@@ -1,0 +1,50 @@
+@inject NavigationManager Nav
+
+<MudPaper Elevation="1" Class="mb-4 px-2 py-1">
+    <MudStack Spacing="1">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pt-1 px-1">
+            <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Style="font-weight:700">@SiteName</MudText>
+            @if (City is not null)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.LocationOn">@City</MudChip>
+            }
+            <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Home">@UnitCount Daire</MudChip>
+        </MudStack>
+        <MudStack Row="true" Spacing="0" Style="flex-wrap:nowrap;overflow-x:auto">
+            @foreach (var (label, icon, route) in _modules)
+            {
+                var r = route;
+                var active = route == ActiveRoute;
+                <MudButton StartIcon="@icon" Size="Size.Small"
+                           Variant="@(active ? Variant.Filled : Variant.Text)"
+                           Color="@(active ? Color.Primary : Color.Default)"
+                           OnClick="@(() => Navigate(r))"
+                           Class="mr-1">
+                    @label
+                </MudButton>
+            }
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public Guid SiteId { get; set; }
+    [Parameter] public string SiteName { get; set; } = "";
+    [Parameter] public string? City { get; set; }
+    [Parameter] public int UnitCount { get; set; }
+    [Parameter] public string ActiveRoute { get; set; } = "";
+
+    private void Navigate(string route) => Nav.NavigateTo($"/site/{SiteId}/{route}");
+
+    private static readonly (string Label, string Icon, string Route)[] _modules =
+    [
+        ("Özet", Icons.Material.Filled.Dashboard, "ozet"),
+        ("Sakinler", Icons.Material.Filled.People, "sakinler"),
+        ("Aidatlar", Icons.Material.Filled.AccountBalance, "aidatlar"),
+        ("Duyurular", Icons.Material.Filled.Notifications, "duyurular"),
+        ("Arızalar", Icons.Material.Filled.Build, "arizalar"),
+        ("Toplantılar", Icons.Material.Filled.Groups, "toplanti"),
+        ("Muhasebe", Icons.Material.Filled.ReceiptLong, "muhasebe"),
+    ];
+}
