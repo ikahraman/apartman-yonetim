@@ -161,11 +161,11 @@ public static class DbSeeder
         await AddGeneratedResidents(sdb, units, 10, "lale", new Random(11));
         var schedule = new SiteFeeSchedule { Name = "Aylık Aidat", Amount = 800, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         sdb.FeeSchedules.Add(schedule); await sdb.SaveChangesAsync();
-        await GeneratePayments(sdb, schedule, 2024, 1, 2026, 5);
+        await GeneratePayments(sdb, schedule, 2026, 3, 2026, 5);
         await AddAnnouncements(sdb, "Lale Apartmanı Yönetimi", "lale");
         await AddMaintenance(sdb, units, new Random(11));
         await AddMeetings(sdb, "Lale Apartmanı Yönetimi", "Lale Apartmanı", 800);
-        await AddAccounting(sdb, schedule, 800, 2024, 1, 2026, 5, "Lale Apartmanı Yönetimi", new Random(11));
+        await AddAccounting(sdb, schedule, 800, 2026, 3, 2026, 5, "Lale Apartmanı Yönetimi", new Random(11));
     }
 
     private static async Task SeedGunesSitesi(FirmDbContext firmDb, SiteDbContextFactory factory)
@@ -191,11 +191,11 @@ public static class DbSeeder
         await AddGeneratedResidents(sdb, units, 20, "gunes", new Random(22));
         var schedule = new SiteFeeSchedule { Name = "Aylık Aidat", Amount = 1200, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         sdb.FeeSchedules.Add(schedule); await sdb.SaveChangesAsync();
-        await GeneratePayments(sdb, schedule, 2024, 1, 2026, 5);
+        await GeneratePayments(sdb, schedule, 2026, 3, 2026, 5);
         await AddAnnouncements(sdb, "Güneş Sitesi Yönetimi", "gunes");
         await AddMaintenance(sdb, units, new Random(22));
         await AddMeetings(sdb, "Güneş Sitesi Yönetimi", "Güneş Sitesi", 1200);
-        await AddAccounting(sdb, schedule, 1200, 2024, 1, 2026, 5, "Güneş Sitesi Yönetimi", new Random(22));
+        await AddAccounting(sdb, schedule, 1200, 2026, 3, 2026, 5, "Güneş Sitesi Yönetimi", new Random(22));
     }
 
     private static async Task SeedYildizRezidans(FirmDbContext firmDb, SiteDbContextFactory factory)
@@ -220,11 +220,11 @@ public static class DbSeeder
         await AddGeneratedResidents(sdb, units, 15, "yildiz", new Random(33));
         var schedule = new SiteFeeSchedule { Name = "Aylık Aidat", Amount = 1500, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         sdb.FeeSchedules.Add(schedule); await sdb.SaveChangesAsync();
-        await GeneratePayments(sdb, schedule, 2024, 1, 2026, 5);
+        await GeneratePayments(sdb, schedule, 2026, 3, 2026, 5);
         await AddAnnouncements(sdb, "Yıldız Rezidans Yönetimi", "yildiz");
         await AddMaintenance(sdb, units, new Random(33));
         await AddMeetings(sdb, "Yıldız Rezidans Yönetimi", "Yıldız Rezidans", 1500);
-        await AddAccounting(sdb, schedule, 1500, 2024, 1, 2026, 5, "Yıldız Rezidans Yönetimi", new Random(33));
+        await AddAccounting(sdb, schedule, 1500, 2026, 3, 2026, 5, "Yıldız Rezidans Yönetimi", new Random(33));
     }
 
     // ─── SEVGİ YÖNETİM SİTELERİ ─────────────────────────────────────────────
@@ -252,11 +252,11 @@ public static class DbSeeder
         await AddGeneratedResidents(sdb, units, 29, "bahar", new Random(101));
         var schedule = new SiteFeeSchedule { Name = "Aylık Aidat", Amount = 1500, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         sdb.FeeSchedules.Add(schedule); await sdb.SaveChangesAsync();
-        await GeneratePayments(sdb, schedule, 2024, 1, 2026, 5);
+        await GeneratePayments(sdb, schedule, 2026, 3, 2026, 5);
         await AddAnnouncements(sdb, "Bahar Sitesi Yönetimi", "bahar");
         await AddMaintenance(sdb, units, new Random(101));
         await AddMeetings(sdb, "Bahar Sitesi Yönetimi", "Bahar Sitesi", 1500);
-        await AddAccounting(sdb, schedule, 1500, 2024, 1, 2026, 5, "Bahar Sitesi Yönetimi", new Random(101));
+        await AddAccounting(sdb, schedule, 1500, 2026, 3, 2026, 5, "Bahar Sitesi Yönetimi", new Random(101));
     }
 
     private static async Task SeedYesilvadiKonutlari(FirmDbContext firmDb, SiteDbContextFactory factory)
@@ -282,11 +282,11 @@ public static class DbSeeder
         await AddGeneratedResidents(sdb, units, 29, "yesilvadi", new Random(202));
         var schedule = new SiteFeeSchedule { Name = "Aylık Aidat", Amount = 1800, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         sdb.FeeSchedules.Add(schedule); await sdb.SaveChangesAsync();
-        await GeneratePayments(sdb, schedule, 2024, 1, 2026, 5);
+        await GeneratePayments(sdb, schedule, 2026, 3, 2026, 5);
         await AddAnnouncements(sdb, "Yeşilvadi Konutları Yönetimi", "yesilvadi");
         await AddMaintenance(sdb, units, new Random(202));
         await AddMeetings(sdb, "Yeşilvadi Konutları Yönetimi", "Yeşilvadi Konutları", 1800);
-        await AddAccounting(sdb, schedule, 1800, 2024, 1, 2026, 5, "Yeşilvadi Konutları Yönetimi", new Random(202));
+        await AddAccounting(sdb, schedule, 1800, 2026, 3, 2026, 5, "Yeşilvadi Konutları Yönetimi", new Random(202));
     }
 
     private static async Task SeedPrestijRezidans(FirmDbContext firmDb, SiteDbContextFactory factory)
@@ -313,12 +313,12 @@ public static class DbSeeder
         var mainSchedule = new SiteFeeSchedule { Name = "Aylık Aidat", Amount = 3000, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         var otoparkSchedule = new SiteFeeSchedule { Name = "Otopark & Havuz", Amount = 800, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         sdb.FeeSchedules.AddRange(mainSchedule, otoparkSchedule); await sdb.SaveChangesAsync();
-        await GeneratePayments(sdb, mainSchedule, 2024, 1, 2026, 5);
-        await GeneratePayments(sdb, otoparkSchedule, 2024, 1, 2026, 5);
+        await GeneratePayments(sdb, mainSchedule, 2026, 3, 2026, 5);
+        await GeneratePayments(sdb, otoparkSchedule, 2026, 3, 2026, 5);
         await AddAnnouncements(sdb, "Prestij Rezidans Yönetimi", "prestij");
         await AddMaintenance(sdb, units, new Random(303));
         await AddMeetings(sdb, "Prestij Rezidans Yönetimi", "Prestij Rezidans", 3000);
-        await AddAccounting(sdb, mainSchedule, 3000, 2024, 1, 2026, 5, "Prestij Rezidans Yönetimi", new Random(303));
+        await AddAccounting(sdb, mainSchedule, 3000, 2026, 3, 2026, 5, "Prestij Rezidans Yönetimi", new Random(303));
     }
 
     private static async Task SeedMetropolSitesi(FirmDbContext firmDb, SiteDbContextFactory factory)
@@ -345,12 +345,12 @@ public static class DbSeeder
         var schedule = new SiteFeeSchedule { Name = "Aylık Aidat", Amount = 2500, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         var spSchedule = new SiteFeeSchedule { Name = "Sosyal Tesis Aidatı", Amount = 500, Period = FeePeriod.Monthly, DueDay = 10, StartDate = new DateOnly(2024, 1, 1) };
         sdb.FeeSchedules.AddRange(schedule, spSchedule); await sdb.SaveChangesAsync();
-        await GeneratePayments(sdb, schedule, 2024, 1, 2026, 5);
-        await GeneratePayments(sdb, spSchedule, 2024, 1, 2026, 5);
+        await GeneratePayments(sdb, schedule, 2026, 3, 2026, 5);
+        await GeneratePayments(sdb, spSchedule, 2026, 3, 2026, 5);
         await AddAnnouncements(sdb, "Metropol Sitesi Yönetimi", "metropol");
         await AddMaintenance(sdb, units, new Random(404));
         await AddMeetings(sdb, "Metropol Sitesi Yönetimi", "Metropol Sitesi", 2500);
-        await AddAccounting(sdb, schedule, 2500, 2024, 1, 2026, 5, "Metropol Sitesi Yönetimi", new Random(404));
+        await AddAccounting(sdb, schedule, 2500, 2026, 3, 2026, 5, "Metropol Sitesi Yönetimi", new Random(404));
     }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────
@@ -419,7 +419,7 @@ public static class DbSeeder
             var dueDate = new DateOnly(cy, cm, Math.Min(schedule.DueDay, DateTime.DaysInMonth(cy, cm)));
             foreach (var unit in units)
             {
-                var isPast = new DateOnly(cy, cm, 1) < new DateOnly(2026, 5, 1);
+                var isPast = new DateOnly(cy, cm, 1) < new DateOnly(2026, 6, 1);
                 var paid = isPast && rnd.NextDouble() > 0.18;
                 db.FeePayments.Add(new SiteFeePayment
                 {
