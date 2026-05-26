@@ -58,6 +58,7 @@ builder.Services.AddScoped<ITenantContext, TenantContext>();
 
 // Firm-level DB: created per-scope, connection string resolved from ITenantContext
 var firmDbDir = builder.Configuration["FirmDbDirectory"] ?? "FirmDatabases";
+Directory.CreateDirectory(firmDbDir);
 builder.Services.AddSingleton(new FirmDbContextFactory(firmDbDir));
 builder.Services.AddScoped<FirmDbContext>(sp =>
 {
