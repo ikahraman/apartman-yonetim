@@ -4,7 +4,7 @@ using ApartmanYonetim.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 namespace ApartmanYonetim.Infrastructure.Services;
 
-public class SiteManagementService(MainDbContext db, SiteDbContextFactory factory) : ISiteManagementService
+public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factory) : ISiteManagementService
 {
     private static SiteDto ToDto(SiteProfile s) =>
         new(s.Id, s.CompanyId, s.Company?.Name ?? "", s.Name, s.Slug, s.Address, s.City, s.UnitCount, s.DbFilePath, s.IsActive,
@@ -18,10 +18,11 @@ public class SiteManagementService(MainDbContext db, SiteDbContextFactory factor
 
     public async Task<List<SiteDto>> GetForUserAsync(string userId)
     {
-        var companyIds = await db.UserCompanyAccess.Where(a => a.UserId == userId).Select(a => a.CompanyId).ToListAsync();
         var siteIds = await db.UserSiteAccess.Where(a => a.UserId == userId).Select(a => a.SiteId).ToListAsync();
+        if (siteIds.Count == 0)
+            return await db.Sites.Include(s => s.Company).OrderBy(s => s.Name).Select(s => ToDto(s)).ToListAsync();
         return await db.Sites.Include(s => s.Company)
-            .Where(s => companyIds.Contains(s.CompanyId) || siteIds.Contains(s.Id))
+            .Where(s => siteIds.Contains(s.Id))
             .OrderBy(s => s.Name).Select(s => ToDto(s)).ToListAsync();
     }
 

@@ -73,7 +73,7 @@
         foreach (var u in users)
         {
             var roles = await UserManager.GetRolesAsync(u);
-            rows.Add(new UserRowVm(u.Id, u.Email ?? "", u.DisplayName, roles.ToList(), u.CreatedAt));
+            rows.Add(new UserRowVm(u.Id, u.Email ?? "", u.DisplayName, roles.ToList(), u.CreatedAt, u.FirmSlug));
         }
         _users = rows;
         _loading = false;
@@ -107,7 +107,8 @@
         var p = new DialogParameters<SiteAssignmentDialog>
         {
             { x => x.UserId, vm.Id },
-            { x => x.UserDisplayName, vm.DisplayName ?? vm.Email }
+            { x => x.UserDisplayName, vm.DisplayName ?? vm.Email },
+            { x => x.FirmSlug, vm.FirmSlug }
         };
         await DialogService.ShowAsync<SiteAssignmentDialog>("Site Erişimi", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
     }
@@ -121,5 +122,5 @@
         else Snackbar.Add(string.Join(", ", result.Errors.Select(e => e.Description)), Severity.Error);
     }
 
-    private record UserRowVm(string Id, string Email, string? DisplayName, List<string> Roles, DateTime CreatedAt);
+    private record UserRowVm(string Id, string Email, string? DisplayName, List<string> Roles, DateTime CreatedAt, string? FirmSlug);
 }

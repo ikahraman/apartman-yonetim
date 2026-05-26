@@ -13,6 +13,8 @@ public class AppUserClaimsPrincipalFactory(
     {
         var identity = await base.GenerateClaimsAsync(user);
         identity.AddClaim(new Claim("DisplayName", user.DisplayName ?? user.Email ?? string.Empty));
+        if (user.FirmSlug is not null)
+            identity.AddClaim(new Claim("firm_slug", user.FirmSlug));
         return identity;
     }
 }

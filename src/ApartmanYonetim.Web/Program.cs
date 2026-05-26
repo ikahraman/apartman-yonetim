@@ -5,6 +5,7 @@ using MudBlazor.Services;
 using ApartmanYonetim.Infrastructure.Identity;
 using ApartmanYonetim.Infrastructure.Persistence;
 using ApartmanYonetim.Infrastructure.Services;
+using ApartmanYonetim.Infrastructure.Tenant;
 using ApartmanYonetim.Application.Services;
 using ApartmanYonetim.Web.Components;
 using ApartmanYonetim.Web.Identity;
@@ -51,10 +52,34 @@ builder.Services.AddIdentityCore<AppUser>(options =>
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
+// Tenant infrastructure
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantContext, TenantContext>();
+
+// Firm-level DB: created per-scope, connection string resolved from ITenantContext
+var firmDbDir = builder.Configuration["FirmDbDirectory"] ?? "FirmDatabases";
+builder.Services.AddSingleton(new FirmDbContextFactory(firmDbDir));
+builder.Services.AddScoped<FirmDbContext>(sp =>
+{
+    var tenant = sp.GetRequiredService<ITenantContext>();
+    var factory = sp.GetRequiredService<FirmDbContextFactory>();
+    if (!tenant.HasFirm)
+    {
+        // Fallback: return an unusable context pointing to a placeholder path.
+        // Services should not be called without a valid tenant.
+        var opts = new DbContextOptionsBuilder<FirmDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+        return new FirmDbContext(opts);
+    }
+    return factory.CreateBySlug(tenant.FirmSlug!);
+});
+
 var siteDbDir = builder.Configuration["SiteDbDirectory"] ?? "SiteDatabases";
 Directory.CreateDirectory(siteDbDir);
 builder.Services.AddSingleton(new SiteDbContextFactory(siteDbDir));
 
+builder.Services.AddScoped<IFirmRegistrationService, FirmRegistrationService>();
 builder.Services.AddScoped<IManagementCompanyService, ManagementCompanyService>();
 builder.Services.AddScoped<ISiteManagementService, SiteManagementService>();
 builder.Services.AddScoped<ISiteResidentService, SiteResidentService>();
@@ -78,6 +103,7 @@ app.UseAntiforgery();
 // Login endpoint
 app.MapPost("/api/auth/login", async (
     HttpContext ctx,
+    ITenantContext tenantCtx,
     SignInManager<AppUser> signInMgr,
     UserManager<AppUser> userMgr) =>
 {
@@ -88,6 +114,10 @@ app.MapPost("/api/auth/login", async (
 
     var user = await userMgr.FindByEmailAsync(email);
     if (user is null) { ctx.Response.Redirect($"/giris?hata=1&returnUrl={Uri.EscapeDataString(returnUrl)}"); return; }
+
+    // Set tenant context before signing in so FirmDbContext resolves correctly if needed
+    if (user.FirmSlug is not null)
+        tenantCtx.SetFirmSlug(user.FirmSlug);
 
     var result = await signInMgr.PasswordSignInAsync(user, password, isPersistent: true, lockoutOnFailure: false);
     ctx.Response.Redirect(result.Succeeded ? returnUrl : $"/giris?hata=1&returnUrl={Uri.EscapeDataString(returnUrl)}");
@@ -124,8 +154,9 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
     var userMgr = services.GetRequiredService<UserManager<AppUser>>();
     var roleMgr = services.GetRequiredService<RoleManager<IdentityRole>>();
-    var factory = services.GetRequiredService<SiteDbContextFactory>();
-    await DbSeeder.SeedAsync(db, userMgr, roleMgr, factory);
+    var firmFactory = services.GetRequiredService<FirmDbContextFactory>();
+    var siteFactory = services.GetRequiredService<SiteDbContextFactory>();
+    await DbSeeder.SeedAsync(db, userMgr, roleMgr, firmFactory, siteFactory);
 }
 
 app.Run();

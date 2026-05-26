@@ -31,6 +31,7 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                 {
                     Id = table.Column<string>(type: "TEXT", nullable: false),
                     DisplayName = table.Column<string>(type: "TEXT", nullable: true),
+                    FirmSlug = table.Column<string>(type: "TEXT", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     UserName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
@@ -53,21 +54,19 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                 });
 
             migrationBuilder.CreateTable(
-                name: "Companies",
+                name: "FirmRegistrations",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     Slug = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    Email = table.Column<string>(type: "TEXT", nullable: true),
-                    Phone = table.Column<string>(type: "TEXT", nullable: true),
-                    Address = table.Column<string>(type: "TEXT", nullable: true),
+                    DbFilePath = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Companies", x => x.Id);
+                    table.PrimaryKey("PK_FirmRegistrations", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -176,52 +175,6 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "Sites",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    CompanyId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
-                    Slug = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    Address = table.Column<string>(type: "TEXT", nullable: true),
-                    City = table.Column<string>(type: "TEXT", nullable: true),
-                    UnitCount = table.Column<int>(type: "INTEGER", nullable: false),
-                    DbFilePath = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
-                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Sites", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Sites_Companies_CompanyId",
-                        column: x => x.CompanyId,
-                        principalTable: "Companies",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserCompanyAccess",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    UserId = table.Column<string>(type: "TEXT", nullable: false),
-                    CompanyId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserCompanyAccess", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_UserCompanyAccess_Companies_CompanyId",
-                        column: x => x.CompanyId,
-                        principalTable: "Companies",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
                 table: "AspNetRoleClaims",
@@ -260,31 +213,9 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Companies_Slug",
-                table: "Companies",
+                name: "IX_FirmRegistrations_Slug",
+                table: "FirmRegistrations",
                 column: "Slug",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Sites_CompanyId",
-                table: "Sites",
-                column: "CompanyId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Sites_Slug",
-                table: "Sites",
-                column: "Slug",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_UserCompanyAccess_CompanyId",
-                table: "UserCompanyAccess",
-                column: "CompanyId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_UserCompanyAccess_UserId_CompanyId",
-                table: "UserCompanyAccess",
-                columns: new[] { "UserId", "CompanyId" },
                 unique: true);
         }
 
@@ -307,19 +238,13 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
-                name: "Sites");
-
-            migrationBuilder.DropTable(
-                name: "UserCompanyAccess");
+                name: "FirmRegistrations");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
-
-            migrationBuilder.DropTable(
-                name: "Companies");
         }
     }
 }

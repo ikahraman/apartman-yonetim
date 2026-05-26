@@ -4,7 +4,7 @@ using ApartmanYonetim.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 namespace ApartmanYonetim.Infrastructure.Services;
 
-public class ManagementCompanyService(MainDbContext db) : IManagementCompanyService
+public class ManagementCompanyService(FirmDbContext db) : IManagementCompanyService
 {
     public async Task<List<CompanyDto>> GetAllAsync()
         => await db.Companies.Include(c => c.Sites)
@@ -13,11 +13,7 @@ public class ManagementCompanyService(MainDbContext db) : IManagementCompanyServ
             .ToListAsync();
 
     public async Task<List<CompanyDto>> GetForUserAsync(string userId)
-        => await db.Companies.Include(c => c.Sites).Include(c => c.UserAccess)
-            .Where(c => c.UserAccess.Any(a => a.UserId == userId))
-            .OrderBy(c => c.Name)
-            .Select(c => new CompanyDto(c.Id, c.Name, c.Slug, c.Email, c.Phone, c.Address, c.IsActive, c.Sites.Count))
-            .ToListAsync();
+        => await GetAllAsync();
 
     public async Task<CompanyDto> CreateAsync(CompanyCommand cmd)
     {

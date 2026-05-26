@@ -1,0 +1,18 @@
+namespace ApartmanYonetim.Application.Services;
+
+public record FirmRegDto(Guid Id, string Name, string Slug, bool IsActive, DateTime CreatedAt);
+public record FirmRegCommand(string Name, string Slug);
+
+public record AdminSiteDto(Guid Id, Guid CompanyId, string FirmSlug, string FirmName, string Name, string Slug,
+    string? City, int UnitCount, string DbFilePath, bool IsActive,
+    DateOnly? ContractStartDate, DateOnly? ContractEndDate, decimal? MonthlyManagementFee, string? ContractNotes);
+
+public interface IFirmRegistrationService
+{
+    Task<List<FirmRegDto>> GetAllAsync();
+    Task<FirmRegDto> CreateAsync(FirmRegCommand cmd);
+    Task UpdateAsync(Guid id, FirmRegCommand cmd);
+    Task<bool> SlugExistsAsync(string slug, Guid? excludeId = null);
+    Task<List<AdminSiteDto>> GetAllSitesAsync();
+    Task<AdminSiteDto> CreateSiteForFirmAsync(string firmSlug, SiteCommand cmd);
+}

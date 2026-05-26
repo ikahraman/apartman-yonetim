@@ -17,67 +17,10 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.8");
 
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.ManagementCompany", b =>
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.FirmRegistration", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Address")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Phone")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.ToTable("Companies");
-                });
-
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteProfile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Address")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("City")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateOnly?>("ContractEndDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ContractNotes")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateOnly?>("ContractStartDate")
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
@@ -91,9 +34,6 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
-                    b.Property<decimal?>("MonthlyManagementFee")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -104,69 +44,12 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("UnitCount")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
 
                     b.HasIndex("Slug")
                         .IsUnique();
 
-                    b.ToTable("Sites");
-                });
-
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.UserCompanyAccess", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("UserId", "CompanyId")
-                        .IsUnique();
-
-                    b.ToTable("UserCompanyAccess");
-                });
-
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.UserSiteAccess", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("SiteId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SiteId");
-
-                    b.HasIndex("UserId", "SiteId")
-                        .IsUnique();
-
-                    b.ToTable("UserSiteAccess");
+                    b.ToTable("FirmRegistrations");
                 });
 
             modelBuilder.Entity("ApartmanYonetim.Infrastructure.Identity.AppUser", b =>
@@ -193,6 +76,9 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
 
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("FirmSlug")
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("INTEGER");
@@ -367,39 +253,6 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteProfile", b =>
-                {
-                    b.HasOne("ApartmanYonetim.Domain.Entities.ManagementCompany", "Company")
-                        .WithMany("Sites")
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Company");
-                });
-
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.UserCompanyAccess", b =>
-                {
-                    b.HasOne("ApartmanYonetim.Domain.Entities.ManagementCompany", "Company")
-                        .WithMany("UserAccess")
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Company");
-                });
-
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.UserSiteAccess", b =>
-                {
-                    b.HasOne("ApartmanYonetim.Domain.Entities.SiteProfile", "Site")
-                        .WithMany("UserAccess")
-                        .HasForeignKey("SiteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Site");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -449,18 +302,6 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.ManagementCompany", b =>
-                {
-                    b.Navigation("Sites");
-
-                    b.Navigation("UserAccess");
-                });
-
-            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteProfile", b =>
-                {
-                    b.Navigation("UserAccess");
                 });
 #pragma warning restore 612, 618
         }

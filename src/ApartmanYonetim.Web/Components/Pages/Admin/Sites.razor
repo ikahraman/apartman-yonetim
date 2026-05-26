@@ -1,7 +1,6 @@
 @page "/admin/siteler"
 @attribute [Authorize(Roles = "SuperAdmin")]
-@inject ISiteManagementService SiteService
-@inject IManagementCompanyService CompanyService
+@inject IFirmRegistrationService FirmService
 @inject IDialogService DialogService
 
 <PageTitle>Siteler</PageTitle>
@@ -13,94 +12,97 @@
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">Site Ekle</MudButton>
     </MudStack>
 
-    <MudTable T="SiteDto" Items="_sites" Hover="true" Elevation="1" Dense="true">
-        <HeaderContent>
-            <MudTh>Site Adı</MudTh>
-            <MudTh>Firma</MudTh>
-            <MudTh>Şehir</MudTh>
-            <MudTh>Daire</MudTh>
-            <MudTh>Sözleşme Başlangıç</MudTh>
-            <MudTh>Sözleşme Bitiş</MudTh>
-            <MudTh>Yönetim Ücreti</MudTh>
-            <MudTh>Durum</MudTh>
-            <MudTh></MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd>
-                <MudText Style="font-weight:500">@context.Name</MudText>
-                @if (!string.IsNullOrWhiteSpace(context.ContractNotes))
-                {
-                    <MudTooltip Text="@context.ContractNotes">
-                        <MudIcon Icon="@Icons.Material.Filled.Notes" Size="Size.Small" Color="Color.Default" Class="ml-1" Style="vertical-align:middle;opacity:0.5" />
-                    </MudTooltip>
-                }
-            </MudTd>
-            <MudTd>@context.CompanyName</MudTd>
-            <MudTd>@(context.City ?? "—")</MudTd>
-            <MudTd>@context.UnitCount</MudTd>
-            <MudTd>
-                @if (context.ContractStartDate.HasValue)
-                {
-                    <MudText Typo="Typo.body2">@context.ContractStartDate.Value.ToString("dd.MM.yyyy")</MudText>
-                }
-                else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
-            </MudTd>
-            <MudTd>
-                @if (context.ContractEndDate.HasValue)
-                {
-                    var isExpired = context.ContractEndDate.Value < DateOnly.FromDateTime(DateTime.Today);
-                    var isExpiringSoon = !isExpired && context.ContractEndDate.Value < DateOnly.FromDateTime(DateTime.Today.AddDays(60));
-                    <MudText Typo="Typo.body2" Color="@(isExpired ? Color.Error : isExpiringSoon ? Color.Warning : Color.Default)">
-                        @context.ContractEndDate.Value.ToString("dd.MM.yyyy")
-                        @if (isExpired) { <span> ⚠ Süresi Doldu</span> }
-                        else if (isExpiringSoon) { <span> ⚠ Yaklaşıyor</span> }
-                    </MudText>
-                }
-                else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
-            </MudTd>
-            <MudTd>
-                @if (context.MonthlyManagementFee.HasValue)
-                {
-                    <MudText Typo="Typo.body2">@context.MonthlyManagementFee.Value.ToString("N0") ₺</MudText>
-                }
-                else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
-            </MudTd>
-            <MudTd>
-                <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
-                    @(context.IsActive ? "Aktif" : "Pasif")
-                </MudChip>
-            </MudTd>
-            <MudTd>
-                <MudStack Row="true" Spacing="0">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="() => OpenEditDialog(context)" />
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudTable T="AdminSiteDto" Items="_sites" Hover="true" Elevation="1" Dense="true">
+            <HeaderContent>
+                <MudTh>Site Adı</MudTh>
+                <MudTh>Firma</MudTh>
+                <MudTh>Şehir</MudTh>
+                <MudTh>Daire</MudTh>
+                <MudTh>Sözleşme Başlangıç</MudTh>
+                <MudTh>Sözleşme Bitiş</MudTh>
+                <MudTh>Yönetim Ücreti</MudTh>
+                <MudTh>Durum</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    <MudText Style="font-weight:500">@context.Name</MudText>
+                    @if (!string.IsNullOrWhiteSpace(context.ContractNotes))
+                    {
+                        <MudTooltip Text="@context.ContractNotes">
+                            <MudIcon Icon="@Icons.Material.Filled.Notes" Size="Size.Small" Color="Color.Default" Class="ml-1" Style="vertical-align:middle;opacity:0.5" />
+                        </MudTooltip>
+                    }
+                </MudTd>
+                <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Info">@context.FirmName</MudChip></MudTd>
+                <MudTd>@(context.City ?? "—")</MudTd>
+                <MudTd>@context.UnitCount</MudTd>
+                <MudTd>
+                    @if (context.ContractStartDate.HasValue)
+                    {
+                        <MudText Typo="Typo.body2">@context.ContractStartDate.Value.ToString("dd.MM.yyyy")</MudText>
+                    }
+                    else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
+                </MudTd>
+                <MudTd>
+                    @if (context.ContractEndDate.HasValue)
+                    {
+                        var isExpired = context.ContractEndDate.Value < DateOnly.FromDateTime(DateTime.Today);
+                        var isExpiringSoon = !isExpired && context.ContractEndDate.Value < DateOnly.FromDateTime(DateTime.Today.AddDays(60));
+                        <MudText Typo="Typo.body2" Color="@(isExpired ? Color.Error : isExpiringSoon ? Color.Warning : Color.Default)">
+                            @context.ContractEndDate.Value.ToString("dd.MM.yyyy")
+                            @if (isExpired) { <span> ⚠ Süresi Doldu</span> }
+                            else if (isExpiringSoon) { <span> ⚠ Yaklaşıyor</span> }
+                        </MudText>
+                    }
+                    else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
+                </MudTd>
+                <MudTd>
+                    @if (context.MonthlyManagementFee.HasValue)
+                    {
+                        <MudText Typo="Typo.body2">@context.MonthlyManagementFee.Value.ToString("N0") ₺</MudText>
+                    }
+                    else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "Aktif" : "Pasif")
+                    </MudChip>
+                </MudTd>
+                <MudTd>
                     <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Color="Color.Secondary" Href="@($"/site/{context.Id}/sakinler")" />
-                </MudStack>
-            </MudTd>
-        </RowTemplate>
-    </MudTable>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
 </MudContainer>
 
 @code {
-    private List<SiteDto> _sites = [];
-    private List<CompanyDto> _companies = [];
+    private List<AdminSiteDto> _sites = [];
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        _sites = await SiteService.GetAllAsync();
-        _companies = await CompanyService.GetAllAsync();
+        _sites = await FirmService.GetAllSitesAsync();
+        _loading = false;
     }
 
     private async Task OpenAddDialog()
     {
-        var p = new DialogParameters<SiteFormDialog> { { x => x.Companies, _companies } };
-        var dialog = await DialogService.ShowAsync<SiteFormDialog>("Site Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        if (!(await dialog.Result)!.Canceled) _sites = await SiteService.GetAllAsync();
-    }
-
-    private async Task OpenEditDialog(SiteDto site)
-    {
-        var p = new DialogParameters<SiteFormDialog> { { x => x.Companies, _companies }, { x => x.Site, site } };
-        var dialog = await DialogService.ShowAsync<SiteFormDialog>("Site Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        if (!(await dialog.Result)!.Canceled) _sites = await SiteService.GetAllAsync();
+        var firms = await FirmService.GetAllAsync();
+        var p = new DialogParameters<AdminSiteFormDialog> { { x => x.Firms, firms } };
+        var dialog = await DialogService.ShowAsync<AdminSiteFormDialog>("Site Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled)
+        {
+            _loading = true;
+            _sites = await FirmService.GetAllSitesAsync();
+            _loading = false;
+        }
     }
 }

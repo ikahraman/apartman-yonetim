@@ -1,15 +1,21 @@
-@inject ISiteManagementService SiteService
+@inject FirmDbContextFactory FirmFactory
+@using ApartmanYonetim.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
 
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="2">
             <MudText Typo="Typo.body2" Color="Color.Secondary">@UserDisplayName için erişilebilir siteler:</MudText>
+            @if (_allSites.Count == 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Warning">Bu kullanıcının bağlı olduğu firma bulunamadı veya site yok.</MudText>
+            }
             @foreach (var site in _allSites)
             {
                 var s = site;
-                <MudCheckBox T="bool" Value="@_selected.Contains(s.Id)"
-                             ValueChanged="@(v => Toggle(s.Id, v))"
-                             Label="@($"{s.Name} ({s.CompanyName})")" />
+                <MudCheckBox T="bool" Value="@_selected.Contains(s.SiteId)"
+                             ValueChanged="@(v => Toggle(s.SiteId, v))"
+                             Label="@s.Name" />
             }
             @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
         </MudStack>
@@ -27,16 +33,21 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public string UserId { get; set; } = "";
     [Parameter] public string UserDisplayName { get; set; } = "";
+    [Parameter] public string? FirmSlug { get; set; }
 
-    private List<SiteDto> _allSites = [];
+    private record SiteRow(Guid SiteId, string Name);
+    private List<SiteRow> _allSites = [];
     private HashSet<Guid> _selected = [];
     private string? _error;
     private bool _busy;
 
     protected override async Task OnInitializedAsync()
     {
-        _allSites = await SiteService.GetAllAsync();
-        var current = await SiteService.GetUserSiteIdsAsync(UserId);
+        if (FirmSlug is null) return;
+        await using var firmDb = FirmFactory.CreateBySlug(FirmSlug);
+        var sites = await firmDb.Sites.OrderBy(s => s.Name).ToListAsync();
+        _allSites = sites.Select(s => new SiteRow(s.Id, s.Name)).ToList();
+        var current = await firmDb.UserSiteAccess.Where(a => a.UserId == UserId).Select(a => a.SiteId).ToListAsync();
         _selected = current.ToHashSet();
     }
 
@@ -48,10 +59,16 @@
 
     private async Task SaveAsync()
     {
+        if (FirmSlug is null) { MudDialog.Cancel(); return; }
         _busy = true; _error = null;
         try
         {
-            await SiteService.SetUserSiteAccessAsync(UserId, _selected.ToList());
+            await using var firmDb = FirmFactory.CreateBySlug(FirmSlug);
+            var existing = await firmDb.UserSiteAccess.Where(a => a.UserId == UserId).ToListAsync();
+            firmDb.UserSiteAccess.RemoveRange(existing);
+            foreach (var siteId in _selected)
+                firmDb.UserSiteAccess.Add(new ApartmanYonetim.Domain.Entities.UserSiteAccess { UserId = UserId, SiteId = siteId });
+            await firmDb.SaveChangesAsync();
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex) { _error = ex.Message; }
