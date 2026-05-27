@@ -33,8 +33,16 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/";
 });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+// On Azure App Service, store SQLite files under /home/data (persists across deployments).
+// Locally, fall back to appsettings.json values.
+var azureHome = Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME") is not null
+    ? (Environment.GetEnvironmentVariable("HOME") ?? "/home")
+    : null;
+
+var connectionString = azureHome is not null
+    ? $"DataSource={azureHome}/data/apartman-main.db;Cache=Shared"
+    : builder.Configuration.GetConnectionString("DefaultConnection")
+      ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 builder.Services.AddDbContext<MainDbContext>(options =>
     options.UseSqlite(connectionString));
@@ -57,7 +65,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 
 // Firm-level DB: created per-scope, connection string resolved from ITenantContext
-var firmDbDir = builder.Configuration["FirmDbDirectory"] ?? "FirmDatabases";
+var firmDbDir = azureHome is not null
+    ? $"{azureHome}/data/FirmDatabases"
+    : builder.Configuration["FirmDbDirectory"] ?? "FirmDatabases";
 Directory.CreateDirectory(firmDbDir);
 builder.Services.AddSingleton(new FirmDbContextFactory(firmDbDir));
 builder.Services.AddScoped<FirmDbContext>(sp =>
@@ -76,7 +86,9 @@ builder.Services.AddScoped<FirmDbContext>(sp =>
     return factory.CreateBySlug(tenant.FirmSlug!);
 });
 
-var siteDbDir = builder.Configuration["SiteDbDirectory"] ?? "SiteDatabases";
+var siteDbDir = azureHome is not null
+    ? $"{azureHome}/data/SiteDatabases"
+    : builder.Configuration["SiteDbDirectory"] ?? "SiteDatabases";
 Directory.CreateDirectory(siteDbDir);
 builder.Services.AddSingleton(new SiteDbContextFactory(siteDbDir));
 
