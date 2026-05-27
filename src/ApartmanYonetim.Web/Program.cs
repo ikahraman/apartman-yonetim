@@ -76,12 +76,13 @@ builder.Services.AddScoped<FirmDbContext>(sp =>
     var factory = sp.GetRequiredService<FirmDbContextFactory>();
     if (!tenant.HasFirm)
     {
-        // Fallback: return an unusable context pointing to a placeholder path.
-        // Services should not be called without a valid tenant.
+        // Fallback for SuperAdmin (no firm): empty in-memory DB with schema so queries return empty results.
         var opts = new DbContextOptionsBuilder<FirmDbContext>()
             .UseSqlite("Data Source=:memory:")
             .Options;
-        return new FirmDbContext(opts);
+        var ctx = new FirmDbContext(opts);
+        ctx.Database.EnsureCreated();
+        return ctx;
     }
     return factory.CreateBySlug(tenant.FirmSlug!);
 });

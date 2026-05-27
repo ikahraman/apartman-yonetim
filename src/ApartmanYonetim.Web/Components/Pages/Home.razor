@@ -90,8 +90,12 @@ else
             return;
         }
 
-        _sites = user.IsInRole("SuperAdmin")
-            ? await SiteService.GetAllAsync()
-            : await SiteService.GetForUserAsync(userId);
+        if (user.IsInRole("SuperAdmin"))
+        {
+            Nav.NavigateTo("/admin/firmalar");
+            return;
+        }
+
+        _sites = await SiteService.GetForUserAsync(userId);
     }
 }
