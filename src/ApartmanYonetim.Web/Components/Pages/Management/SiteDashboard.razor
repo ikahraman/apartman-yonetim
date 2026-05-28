@@ -82,6 +82,47 @@
             </MudItem>
         </MudGrid>
 
+        @* ─── GRAFİKLER ──────────────────────────────────────────────────────── *@
+        <MudGrid Spacing="3" Class="mb-5">
+            <MudItem xs="12" md="5">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-1">Son 6 Ay Tahsilat Oranı (%)</MudText>
+                    <MudChart T="double" ChartType="ChartType.Bar"
+                              ChartSeries="@_collectionSeries"
+                              XAxisLabels="@_monthLabels"
+                              Width="100%" Height="200px" />
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="3">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-1">Bu Ay Ödeme Durumu</MudText>
+                    @if (_donutData.Sum() > 0)
+                    {
+                        <MudChart T="double" ChartType="ChartType.Donut"
+                                  InputData="@_donutData"
+                                  InputLabels="@_donutLabels"
+                                  Width="100%" Height="200px" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-4">Ödeme kaydı yok.</MudText>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="1" Class="pa-4">
+                    <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-1">Son 6 Ay Gelir / Gider (₺)</MudText>
+                    <MudChart T="double" ChartType="ChartType.Bar"
+                              ChartSeries="@_accountingSeries"
+                              XAxisLabels="@_monthLabels"
+                              Width="100%" Height="200px" />
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @* ─── BİLGİ PANELLERİ ────────────────────────────────────────────────── *@
         <MudGrid Spacing="3">
             <MudItem xs="12" md="5">
                 <MudPaper Elevation="1" Class="pa-4" Style="height:340px;overflow-y:auto">
@@ -229,6 +270,14 @@
     private List<AnnouncementDto> _recentAnnouncements = [];
     private List<MeetingDto> _upcomingMeetings = [];
 
+    // Grafik verileri
+    private double[] _monthlyRates = new double[6];
+    private string[] _monthLabels = new string[6];
+    private double[] _donutData = [0, 0, 0];
+    private string[] _donutLabels = ["Ödendi", "Gecikmiş", "Bekliyor"];
+    private List<ChartSeries<double>> _collectionSeries = new();
+    private List<ChartSeries<double>> _accountingSeries = new();
+
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
@@ -272,6 +321,53 @@
             .Take(3)
             .ToList();
 
+        await LoadChartDataAsync(db, schedules.Where(s => s.IsActive).ToList(), now);
+
         _loading = false;
+    }
+
+    private async Task LoadChartDataAsync(string dbFilePath, List<FeeScheduleDto> activeSchedules, DateTime now)
+    {
+        var culture = new System.Globalization.CultureInfo("tr-TR");
+        var months = Enumerable.Range(0, 6).Select(i => now.AddMonths(-5 + i)).ToList();
+        _monthLabels = months.Select(m => m.ToString("MMM yy", culture)).ToArray();
+
+        // Son 6 ay tahsilat oranı
+        for (int i = 0; i < 6; i++)
+        {
+            var m = months[i];
+            decimal exp = 0, col = 0;
+            foreach (var s in activeSchedules)
+            {
+                var (e, c, _, _) = await FeeService.GetMonthSummaryAsync(dbFilePath, s.Id, m.Year, m.Month);
+                exp += e; col += c;
+            }
+            _monthlyRates[i] = exp > 0 ? Math.Round((double)col / (double)exp * 100, 1) : 0;
+        }
+
+        // Bu ay ödeme durumu dağılımı
+        var (paid, overdue, pending) = await FeeService.GetMonthStatusCountsAsync(dbFilePath, now.Year, now.Month);
+        _donutData = [(double)paid, (double)overdue, (double)pending];
+        _donutLabels = [$"Ödendi ({paid})", $"Gecikmiş ({overdue})", $"Bekliyor ({pending})"];
+
+        // Son 6 ay gelir/gider
+        var incomes = new double[6];
+        var expenses = new double[6];
+        for (int i = 0; i < 6; i++)
+        {
+            var m = months[i];
+            var s = await AccountingService.GetSummaryAsync(dbFilePath, m.Year, m.Month);
+            incomes[i] = (double)s.TotalIncome;
+            expenses[i] = (double)s.TotalExpense;
+        }
+        _collectionSeries =
+        [
+            new ChartSeries<double> { Name = "Tahsilat %", Data = _monthlyRates }
+        ];
+        _accountingSeries =
+        [
+            new ChartSeries<double> { Name = "Gelir", Data = incomes },
+            new ChartSeries<double> { Name = "Gider", Data = expenses }
+        ];
     }
 }

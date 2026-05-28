@@ -105,4 +105,16 @@ public class SiteFeeService(SiteDbContextFactory factory) : ISiteFeeService
             payments.Count(p => p.Status == FeePaymentStatus.Paid),
             payments.Count(p => p.Status is FeePaymentStatus.Pending or FeePaymentStatus.Overdue));
     }
+
+    public async Task<(int PaidCount, int OverdueCount, int PendingCount)> GetMonthStatusCountsAsync(string dbFilePath, int year, int month)
+    {
+        await using var db = factory.Create(dbFilePath);
+        var label = PeriodLabel(year, month);
+        var payments = await db.FeePayments.Where(p => p.PeriodLabel == label).ToListAsync();
+        return (
+            payments.Count(p => p.Status == FeePaymentStatus.Paid),
+            payments.Count(p => p.Status == FeePaymentStatus.Overdue),
+            payments.Count(p => p.Status == FeePaymentStatus.Pending)
+        );
+    }
 }

@@ -16,4 +16,5 @@ public interface ISiteFeeService
     Task GeneratePaymentsForMonthAsync(string dbFilePath, Guid scheduleId, int year, int month);
     Task RecordPaymentAsync(string dbFilePath, Guid paymentId, decimal amount, DateOnly paidDate, string? notes);
     Task<(decimal TotalExpected, decimal TotalCollected, int PaidCount, int PendingCount)> GetMonthSummaryAsync(string dbFilePath, Guid scheduleId, int year, int month);
+    Task<(int PaidCount, int OverdueCount, int PendingCount)> GetMonthStatusCountsAsync(string dbFilePath, int year, int month);
 }
