@@ -1,0 +1,133 @@
+@page "/sakin/toplanti"
+@attribute [Authorize(Roles = "Resident")]
+@inject ISiteManagementService SiteService
+@inject ISiteResidentService ResidentService
+@inject ISiteMeetingService MeetingService
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Toplantılar</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudButton Href="/sakin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack">Portal</MudButton>
+        <MudText Typo="Typo.h5" Style="font-weight:700">Toplantılar</MudText>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        @if (_upcoming.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-2">Yaklaşan Toplantılar</MudText>
+            <MudStack Spacing="2" Class="mb-5">
+                @foreach (var m in _upcoming)
+                {
+                    <MudPaper Elevation="1" Class="pa-4">
+                        <MudStack Row="true" AlignItems="AlignItems.Start">
+                            <MudIcon Icon="@Icons.Material.Filled.Event" Color="Color.Primary" Class="mt-1 mr-3" />
+                            <MudStack Spacing="1" Style="flex:1">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudText Typo="Typo.h6" Style="font-weight:600">@m.Title</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@MeetingTypeLabel(m.MeetingType)</MudChip>
+                                </MudStack>
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.body2">@m.MeetingDate.ToString("dd MMMM yyyy, HH:mm", new System.Globalization.CultureInfo("tr-TR"))</MudText>
+                                </MudStack>
+                                @if (m.Location is not null)
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.body2">@m.Location</MudText>
+                                    </MudStack>
+                                }
+                                @if (m.AgendaItems is not null)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">Gündem: @m.AgendaItems</MudText>
+                                }
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">Yaklaşan toplantı bulunmuyor.</MudAlert>
+        }
+
+        @if (_past.Count > 0)
+        {
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600" Class="mb-2">Geçmiş Toplantılar</MudText>
+            <MudStack Spacing="2">
+                @foreach (var m in _past)
+                {
+                    <MudPaper Elevation="1" Class="pa-3">
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Color="Color.Secondary" Class="mr-3" />
+                            <MudStack Spacing="0" Style="flex:1">
+                                <MudText Typo="Typo.body1" Style="font-weight:500">@m.Title</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @m.MeetingDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("tr-TR"))
+                                    @if (m.Location is not null) { <span> · @m.Location</span> }
+                                </MudText>
+                            </MudStack>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudChip T="string" Size="Size.Small" Color="@(m.Status == MeetingStatus.Completed ? Color.Success : Color.Default)">
+                                    @(m.Status == MeetingStatus.Completed ? "Tamamlandı" : "İptal")
+                                </MudChip>
+                                @if (m.HasMinutes)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Description">Tutanak</MudChip>
+                                }
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private List<MeetingDto> _upcoming = [];
+    private List<MeetingDto> _past = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var sites = await SiteService.GetAllAsync();
+        foreach (var site in sites)
+        {
+            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
+            if (r is not null)
+            {
+                var all = await MeetingService.GetAllAsync(site.DbFilePath);
+                _upcoming = all
+                    .Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now)
+                    .OrderBy(m => m.MeetingDate)
+                    .ToList();
+                _past = all
+                    .Where(m => m.Status != MeetingStatus.Scheduled || m.MeetingDate <= DateTime.Now)
+                    .OrderByDescending(m => m.MeetingDate)
+                    .Take(10)
+                    .ToList();
+                break;
+            }
+        }
+        _loading = false;
+    }
+
+    private static string MeetingTypeLabel(MeetingType t) => t switch
+    {
+        MeetingType.Ordinary => "Olağan",
+        MeetingType.Extraordinary => "Olağanüstü",
+        MeetingType.Emergency => "Acil",
+        _ => t.ToString()
+    };
+}

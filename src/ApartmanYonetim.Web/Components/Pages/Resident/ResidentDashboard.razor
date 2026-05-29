@@ -4,6 +4,7 @@
 @inject ISiteResidentService ResidentService
 @inject ISiteAnnouncementService AnnouncementService
 @inject ISiteFeeService FeeService
+@inject ISiteMeetingService MeetingService
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
 
@@ -68,6 +69,20 @@
                 </MudCard>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo("/sakin/toplanti"))'>
+                    <MudCardContent>
+                        <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.Groups" Color="Color.Info" Style="font-size:2.5rem" />
+                            <MudText Typo="Typo.h6">Toplantılar</MudText>
+                            @if (_upcomingMeetingCount > 0)
+                            {
+                                <MudChip T="string" Color="Color.Info" Size="Size.Small">@_upcomingMeetingCount yaklaşan</MudChip>
+                            }
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
                 <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo("/sakin/profil"))'>
                     <MudCardContent>
                         <MudStack AlignItems="AlignItems.Center" Spacing="1">
@@ -77,6 +92,76 @@
                     </MudCardContent>
                 </MudCard>
             </MudItem>
+        </MudGrid>
+
+        @* ─── ÖZET PANELLERİ ─────────────────────────────────────────────── *@
+        <MudGrid Spacing="3" Class="mt-4">
+            @if (_lastAnnouncement is not null)
+            {
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="1" Class="pa-4" Style="height:160px">
+                        <MudStack Spacing="1">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Campaign" Size="Size.Small" Color="Color.Primary" />
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">Son Duyuru</MudText>
+                                <MudSpacer />
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Href="/sakin/duyurular">Tümü</MudButton>
+                            </MudStack>
+                            @if (_lastAnnouncement.IsUrgent)
+                            {
+                                <MudChip T="string" Color="Color.Error" Size="Size.Small" Style="width:fit-content">Acil</MudChip>
+                            }
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@_lastAnnouncement.Title</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @_lastAnnouncement.PublishedAt.ToString("dd MMM yyyy", new System.Globalization.CultureInfo("tr-TR"))
+                            </MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            }
+
+            @if (_nextMeeting is not null)
+            {
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="1" Class="pa-4" Style="height:160px">
+                        <MudStack Spacing="1">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" Color="Color.Info" />
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">Sonraki Toplantı</MudText>
+                                <MudSpacer />
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Href="/sakin/toplanti">Tümü</MudButton>
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@_nextMeeting.Title</MudText>
+                            <MudText Typo="Typo.body2">@_nextMeeting.MeetingDate.ToString("dd MMM yyyy, HH:mm", new System.Globalization.CultureInfo("tr-TR"))</MudText>
+                            @if (_nextMeeting.Location is not null)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@_nextMeeting.Location</MudText>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            }
+
+            @if (_lastPayment is not null)
+            {
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="1" Class="pa-4" Style="height:160px">
+                        <MudStack Spacing="1">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.Receipt" Size="Size.Small" Color="Color.Warning" />
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600">Son Aidat</MudText>
+                                <MudSpacer />
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Href="/sakin/aidatlar">Tümü</MudButton>
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">@_lastPayment.PeriodLabel</MudText>
+                            <MudText Typo="Typo.body2">@_lastPayment.Amount.ToString("N0") ₺</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="@PaymentColor(_lastPayment.Status)" Style="width:fit-content">
+                                @PaymentLabel(_lastPayment.Status)
+                            </MudChip>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            }
         </MudGrid>
     }
 </MudContainer>
@@ -88,6 +173,10 @@
     private string? _unitNumber;
     private int _activeAnnouncementCount;
     private int _pendingFeeCount;
+    private int _upcomingMeetingCount;
+    private AnnouncementDto? _lastAnnouncement;
+    private MeetingDto? _nextMeeting;
+    private FeePaymentDto? _lastPayment;
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,13 +192,25 @@
                 _resident = r;
                 var units = await ResidentService.GetUnitsAsync(site.DbFilePath);
                 _unitNumber = units.FirstOrDefault(u => u.Id == r.UnitId)?.Number;
+
                 var announcements = await AnnouncementService.GetActiveAsync(site.DbFilePath);
                 _activeAnnouncementCount = announcements.Count;
+                _lastAnnouncement = announcements.OrderByDescending(a => a.PublishedAt).FirstOrDefault();
+
                 var recentPayments = await FeeService.GetPaymentsByUnitAsync(site.DbFilePath, r.UnitId, 6);
-                _pendingFeeCount = recentPayments.Count(p => p.Status != ApartmanYonetim.Domain.Enums.FeePaymentStatus.Paid);
+                _pendingFeeCount = recentPayments.Count(p => p.Status != FeePaymentStatus.Paid);
+                _lastPayment = recentPayments.OrderByDescending(p => p.DueDate).FirstOrDefault();
+
+                var meetings = await MeetingService.GetAllAsync(site.DbFilePath);
+                var upcoming = meetings.Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now).OrderBy(m => m.MeetingDate).ToList();
+                _upcomingMeetingCount = upcoming.Count;
+                _nextMeeting = upcoming.FirstOrDefault();
                 break;
             }
         }
         _loading = false;
     }
+
+    private static Color PaymentColor(FeePaymentStatus s) => s switch { FeePaymentStatus.Paid => Color.Success, FeePaymentStatus.Overdue => Color.Error, _ => Color.Warning };
+    private static string PaymentLabel(FeePaymentStatus s) => s switch { FeePaymentStatus.Paid => "Ödendi", FeePaymentStatus.Overdue => "Gecikmiş", _ => "Bekliyor" };
 }
