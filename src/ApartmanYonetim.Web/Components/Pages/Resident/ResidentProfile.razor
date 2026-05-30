@@ -95,8 +95,9 @@
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
         _userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-        var sites = await SiteService.GetAllAsync();
-        foreach (var site in sites)
+        if (!Guid.TryParse(auth.User.FindFirst("site_id")?.Value, out var siteId)) { _loading = false; return; }
+        var site = await SiteService.GetByIdAsync(siteId);
+        if (site is not null)
         {
             var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, _userId);
             if (r is not null)
@@ -105,7 +106,6 @@
                 _siteName = site.Name;
                 var units = await ResidentService.GetUnitsAsync(site.DbFilePath);
                 _unitNumber = units.FirstOrDefault(u => u.Id == r.UnitId)?.Number;
-                break;
             }
         }
         _loading = false;

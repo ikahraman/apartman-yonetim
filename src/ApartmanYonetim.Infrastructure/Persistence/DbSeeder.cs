@@ -75,6 +75,11 @@ public static class DbSeeder
             var laleSite = await firmDb.Sites.FirstOrDefaultAsync(s => s.Slug == "lale-apartmani");
             if (laleSite != null)
             {
+                if (residentUser.SiteId != laleSite.Id)
+                {
+                    residentUser.SiteId = laleSite.Id;
+                    await userManager.UpdateAsync(residentUser);
+                }
                 await using var laleDb = siteFactory.Create(laleSite.DbFilePath);
                 var firstResident = await laleDb.Residents.OrderBy(r => r.Id).FirstOrDefaultAsync();
                 if (firstResident != null && firstResident.UserId is null)

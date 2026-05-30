@@ -65,19 +65,16 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-        var sites = await SiteService.GetAllAsync();
-        foreach (var site in sites)
+        var user = auth.User;
+        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        if (!Guid.TryParse(user.FindFirst("site_id")?.Value, out var siteId)) { _loading = false; return; }
+        _site = await SiteService.GetByIdAsync(siteId);
+        if (_site is null) { _loading = false; return; }
+        _resident = await ResidentService.GetByUserIdAsync(_site.DbFilePath, userId);
+        if (_resident is not null)
         {
-            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
-            if (r is not null)
-            {
-                _site = site;
-                _resident = r;
-                var all = await MaintenanceService.GetAllAsync(site.DbFilePath);
-                _requests = all.Where(req => req.UnitId == r.UnitId).ToList();
-                break;
-            }
+            var all = await MaintenanceService.GetAllAsync(_site.DbFilePath);
+            _requests = all.Where(req => req.UnitId == _resident.UnitId).ToList();
         }
         _loading = false;
     }

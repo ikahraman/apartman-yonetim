@@ -181,32 +181,34 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-        var sites = await SiteService.GetAllAsync();
-        foreach (var site in sites)
+        var user = auth.User;
+        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var siteIdStr = user.FindFirst("site_id")?.Value;
+
+        if (!Guid.TryParse(siteIdStr, out var siteId)) { _loading = false; return; }
+
+        _site = await SiteService.GetByIdAsync(siteId);
+        if (_site is null) { _loading = false; return; }
+
+        var r = await ResidentService.GetByUserIdAsync(_site.DbFilePath, userId);
+        if (r is not null)
         {
-            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
-            if (r is not null)
-            {
-                _site = site;
-                _resident = r;
-                var units = await ResidentService.GetUnitsAsync(site.DbFilePath);
-                _unitNumber = units.FirstOrDefault(u => u.Id == r.UnitId)?.Number;
+            _resident = r;
+            var units = await ResidentService.GetUnitsAsync(_site.DbFilePath);
+            _unitNumber = units.FirstOrDefault(u => u.Id == r.UnitId)?.Number;
 
-                var announcements = await AnnouncementService.GetActiveAsync(site.DbFilePath);
-                _activeAnnouncementCount = announcements.Count;
-                _lastAnnouncement = announcements.OrderByDescending(a => a.PublishedAt).FirstOrDefault();
+            var announcements = await AnnouncementService.GetActiveAsync(_site.DbFilePath);
+            _activeAnnouncementCount = announcements.Count;
+            _lastAnnouncement = announcements.OrderByDescending(a => a.PublishedAt).FirstOrDefault();
 
-                var recentPayments = await FeeService.GetPaymentsByUnitAsync(site.DbFilePath, r.UnitId, 6);
-                _pendingFeeCount = recentPayments.Count(p => p.Status != FeePaymentStatus.Paid);
-                _lastPayment = recentPayments.OrderByDescending(p => p.DueDate).FirstOrDefault();
+            var recentPayments = await FeeService.GetPaymentsByUnitAsync(_site.DbFilePath, r.UnitId, 6);
+            _pendingFeeCount = recentPayments.Count(p => p.Status != FeePaymentStatus.Paid);
+            _lastPayment = recentPayments.OrderByDescending(p => p.DueDate).FirstOrDefault();
 
-                var meetings = await MeetingService.GetAllAsync(site.DbFilePath);
-                var upcoming = meetings.Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now).OrderBy(m => m.MeetingDate).ToList();
-                _upcomingMeetingCount = upcoming.Count;
-                _nextMeeting = upcoming.FirstOrDefault();
-                break;
-            }
+            var meetings = await MeetingService.GetAllAsync(_site.DbFilePath);
+            var upcoming = meetings.Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now).OrderBy(m => m.MeetingDate).ToList();
+            _upcomingMeetingCount = upcoming.Count;
+            _nextMeeting = upcoming.FirstOrDefault();
         }
         _loading = false;
     }

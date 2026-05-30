@@ -50,6 +50,8 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public string DbFilePath { get; set; } = "";
     [Parameter] public UnitSummaryDto Unit { get; set; } = default!;
+    [Parameter] public Guid SiteId { get; set; }
+    [Parameter] public string FirmSlug { get; set; } = "";
 
     private string _firstName = "";
     private string _lastName = "";
@@ -92,7 +94,7 @@
                 var count = UserManager.Users.Count(u => u.UserName != null && u.UserName.StartsWith("sakin-"));
                 var username = $"sakin-{count + 1}";
                 var password = "Sakin1234!";
-                var user = new AppUser { UserName = username, Email = _email, DisplayName = $"{_firstName.Trim()} {_lastName.Trim()}" };
+                var user = new AppUser { UserName = username, Email = _email, DisplayName = $"{_firstName.Trim()} {_lastName.Trim()}", FirmSlug = FirmSlug, SiteId = SiteId };
                 var result = await UserManager.CreateAsync(user, password);
                 if (result.Succeeded)
                 {

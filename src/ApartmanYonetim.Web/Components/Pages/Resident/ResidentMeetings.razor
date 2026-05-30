@@ -100,25 +100,20 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-        var sites = await SiteService.GetAllAsync();
-        foreach (var site in sites)
+        if (!Guid.TryParse(auth.User.FindFirst("site_id")?.Value, out var siteId)) { _loading = false; return; }
+        var site = await SiteService.GetByIdAsync(siteId);
+        if (site is not null)
         {
-            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
-            if (r is not null)
-            {
-                var all = await MeetingService.GetAllAsync(site.DbFilePath);
-                _upcoming = all
-                    .Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now)
-                    .OrderBy(m => m.MeetingDate)
-                    .ToList();
-                _past = all
-                    .Where(m => m.Status != MeetingStatus.Scheduled || m.MeetingDate <= DateTime.Now)
-                    .OrderByDescending(m => m.MeetingDate)
-                    .Take(10)
-                    .ToList();
-                break;
-            }
+            var all = await MeetingService.GetAllAsync(site.DbFilePath);
+            _upcoming = all
+                .Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now)
+                .OrderBy(m => m.MeetingDate)
+                .ToList();
+            _past = all
+                .Where(m => m.Status != MeetingStatus.Scheduled || m.MeetingDate <= DateTime.Now)
+                .OrderByDescending(m => m.MeetingDate)
+                .Take(10)
+                .ToList();
         }
         _loading = false;
     }

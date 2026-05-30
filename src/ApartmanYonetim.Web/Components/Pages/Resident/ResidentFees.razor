@@ -51,17 +51,14 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-        var sites = await SiteService.GetAllAsync();
-        foreach (var site in sites)
-        {
-            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
-            if (r is not null)
-            {
-                _payments = await FeeService.GetPaymentsByUnitAsync(site.DbFilePath, r.UnitId, 24);
-                break;
-            }
-        }
+        var user = auth.User;
+        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        if (!Guid.TryParse(user.FindFirst("site_id")?.Value, out var siteId)) { _loading = false; return; }
+        var site = await SiteService.GetByIdAsync(siteId);
+        if (site is null) { _loading = false; return; }
+        var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
+        if (r is not null)
+            _payments = await FeeService.GetPaymentsByUnitAsync(site.DbFilePath, r.UnitId, 24);
         _loading = false;
     }
 

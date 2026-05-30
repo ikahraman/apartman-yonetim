@@ -5,5 +5,6 @@ public class AppUser : IdentityUser
 {
     public string? DisplayName { get; set; }
     public string? FirmSlug { get; set; }
+    public Guid? SiteId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

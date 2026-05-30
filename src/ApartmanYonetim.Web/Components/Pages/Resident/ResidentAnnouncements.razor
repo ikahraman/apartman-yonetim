@@ -1,7 +1,6 @@
 @page "/sakin/duyurular"
 @attribute [Authorize(Roles = "Resident")]
 @inject ISiteManagementService SiteService
-@inject ISiteResidentService ResidentService
 @inject ISiteAnnouncementService AnnouncementService
 @inject AuthenticationStateProvider AuthProvider
 
@@ -52,17 +51,11 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-        var sites = await SiteService.GetAllAsync();
-        foreach (var site in sites)
-        {
-            var r = await ResidentService.GetByUserIdAsync(site.DbFilePath, userId);
-            if (r is not null)
-            {
-                _announcements = await AnnouncementService.GetActiveAsync(site.DbFilePath);
-                break;
-            }
-        }
+        var user = auth.User;
+        if (!Guid.TryParse(user.FindFirst("site_id")?.Value, out var siteId)) { _loading = false; return; }
+        var site = await SiteService.GetByIdAsync(siteId);
+        if (site is not null)
+            _announcements = await AnnouncementService.GetActiveAsync(site.DbFilePath);
         _loading = false;
     }
 }

@@ -15,6 +15,8 @@ public class AppUserClaimsPrincipalFactory(
         identity.AddClaim(new Claim("DisplayName", user.DisplayName ?? user.Email ?? string.Empty));
         if (user.FirmSlug is not null)
             identity.AddClaim(new Claim("firm_slug", user.FirmSlug));
+        if (user.SiteId is not null)
+            identity.AddClaim(new Claim("site_id", user.SiteId.Value.ToString()));
         return identity;
     }
 }
