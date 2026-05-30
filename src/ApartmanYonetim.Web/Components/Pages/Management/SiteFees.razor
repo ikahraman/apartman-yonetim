@@ -2,8 +2,10 @@
 @attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
 @inject ISiteManagementService SiteService
 @inject ISiteFeeService FeeService
+@inject ISiteReportService ReportService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageTitle>Aidatlar</PageTitle>
 
@@ -86,9 +88,11 @@
                             }
                         </MudSelect>
                         <MudButton Variant="Variant.Outlined" OnClick="LoadPayments" StartIcon="@Icons.Material.Filled.Search">Getir</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportExcelAsync">Excel</MudButton>
                         @if (!_readOnly)
                         {
                             <MudButton Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.AutoFixHigh" OnClick="GenerateAsync">Tahakkuk Oluştur</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.AllInclusive" OnClick="GenerateAllAsync">Tümü İçin Oluştur</MudButton>
                         }
                     </MudStack>
 
@@ -155,6 +159,7 @@
         _site = await SiteService.GetByIdAsync(SiteId);
         if (_site is not null)
         {
+            await FeeService.MarkOverdueAsync(_site.DbFilePath);
             _schedules = await FeeService.GetSchedulesAsync(_site.DbFilePath);
             _selectedSchedule = _schedules.FirstOrDefault(s => s.IsActive) ?? _schedules.FirstOrDefault();
         }
@@ -211,6 +216,27 @@
         var p = new DialogParameters<RecordPaymentDialog> { { x => x.DbFilePath, _site!.DbFilePath }, { x => x.Payment, payment } };
         var dialog = await DialogService.ShowAsync<RecordPaymentDialog>("Ödeme Kaydet", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         if (!(await dialog.Result)!.Canceled) await LoadPayments();
+    }
+
+    private async Task ExportExcelAsync()
+    {
+        if (_site is null) return;
+        var bytes = await ReportService.ExportFeeCollectionAsync(_site.DbFilePath, _year, _month);
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFile", $"aidat-tahsilat-{_year}-{_month:D2}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", base64);
+    }
+
+    private async Task GenerateAllAsync()
+    {
+        if (_site is null) return;
+        try
+        {
+            var (generated, skipped) = await FeeService.GenerateForAllSchedulesAsync(_site.DbFilePath, _year, _month);
+            Snackbar.Add($"{generated} tarife için tahakkuk oluşturuldu{(skipped > 0 ? $", {skipped} zaten mevcuttu" : "")}.", Severity.Success);
+            await LoadPayments();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
     }
 
     private static string PeriodLabel(FeePeriod p) => p switch { FeePeriod.Monthly => "Aylık", FeePeriod.Quarterly => "3 Aylık", FeePeriod.Yearly => "Yıllık", _ => "" };

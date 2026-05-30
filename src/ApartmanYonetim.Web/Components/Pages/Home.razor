@@ -59,6 +59,18 @@ else
                         </MudStack>
                     </MudCardContent>
                     <MudCardActions>
+                        @if (s.ContractEndDate.HasValue)
+                        {
+                            var d = (s.ContractEndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days;
+                            @if (d <= 90)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="@(d <= 30 ? Color.Error : Color.Warning)"
+                                         Icon="@Icons.Material.Filled.Warning">
+                                    @(d <= 0 ? "Sözleşme doldu!" : $"Sözleşme: {d} gün")
+                                </MudChip>
+                            }
+                        }
+                        <MudSpacer />
                         <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                                    StartIcon="@Icons.Material.Filled.ManageAccounts"
                                    OnClick="@(() => GoToSite(s.Id))">

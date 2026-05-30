@@ -21,6 +21,20 @@
         <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
                           UnitCount="@_site.UnitCount" ActiveRoute="ozet" />
 
+        @if (_site.ContractEndDate.HasValue)
+        {
+            var daysLeft = (_site.ContractEndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days;
+            @if (daysLeft <= 90)
+            {
+                <MudAlert Severity="@(daysLeft <= 30 ? Severity.Error : Severity.Warning)" Class="mb-4"
+                          Icon="@(daysLeft <= 30 ? Icons.Material.Filled.Warning : Icons.Material.Filled.Info)">
+                    <strong>Sözleşme Bitiş Uyarısı:</strong> Bu sitenin yönetim sözleşmesi
+                    <strong>@daysLeft gün</strong> sonra (@_site.ContractEndDate.Value.ToString("dd.MM.yyyy")) sona eriyor.
+                    @if (daysLeft <= 0) { <span> Sözleşme süresi dolmuştur!</span> }
+                </MudAlert>
+            }
+        }
+
         <MudGrid Spacing="3" Class="mb-5">
             <MudItem xs="12" sm="6" md="3">
                 <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/sakinler"))'>

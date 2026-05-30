@@ -2,9 +2,11 @@
 @attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
 @inject ISiteManagementService SiteService
 @inject ISiteAccountingService AccountingService
+@inject ISiteReportService ReportService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthProvider
+@inject IJSRuntime JS
 
 <PageTitle>Muhasebe</PageTitle>
 
@@ -37,6 +39,7 @@
             </MudSelect>
             <MudButton Variant="Variant.Outlined" OnClick="Reload" StartIcon="@Icons.Material.Filled.Search">Filtrele</MudButton>
             <MudSpacer />
+            <MudButton Variant="Variant.Outlined" Color="Color.Success" StartIcon="@Icons.Material.Filled.Download" OnClick="ExportExcelAsync">Excel</MudButton>
             @if (!_readOnly)
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">Kayıt Ekle</MudButton>
@@ -130,6 +133,16 @@
         if (_site is null) return;
         _entries = await AccountingService.GetAllAsync(_site.DbFilePath, _year, _month);
         _summary = await AccountingService.GetSummaryAsync(_site.DbFilePath, _year, _month);
+    }
+
+    private async Task ExportExcelAsync()
+    {
+        if (_site is null) return;
+        var exportYear = _year ?? DateTime.Now.Year;
+        var bytes = await ReportService.ExportAccountingSummaryAsync(_site.DbFilePath, exportYear);
+        var base64 = Convert.ToBase64String(bytes);
+        await JS.InvokeVoidAsync("downloadFile", $"muhasebe-{exportYear}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", base64);
     }
 
     private string GetCurrentUser()

@@ -102,6 +102,7 @@ builder.Services.AddScoped<ISiteAnnouncementService, SiteAnnouncementService>();
 builder.Services.AddScoped<ISiteMaintenanceService, SiteMaintenanceService>();
 builder.Services.AddScoped<ISiteMeetingService, SiteMeetingService>();
 builder.Services.AddScoped<ISiteAccountingService, SiteAccountingService>();
+builder.Services.AddScoped<ISiteReportService, SiteReportService>();
 
 var app = builder.Build();
 

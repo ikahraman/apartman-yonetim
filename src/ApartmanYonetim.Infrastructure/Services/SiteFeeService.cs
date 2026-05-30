@@ -117,4 +117,37 @@ public class SiteFeeService(SiteDbContextFactory factory) : ISiteFeeService
             payments.Count(p => p.Status == FeePaymentStatus.Pending)
         );
     }
+
+    public async Task<int> MarkOverdueAsync(string dbFilePath)
+    {
+        await using var db = factory.Create(dbFilePath);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var overdue = await db.FeePayments
+            .Where(p => p.Status == FeePaymentStatus.Pending && p.DueDate < today)
+            .ToListAsync();
+        foreach (var p in overdue)
+            p.Status = FeePaymentStatus.Overdue;
+        if (overdue.Count > 0)
+            await db.SaveChangesAsync();
+        return overdue.Count;
+    }
+
+    public async Task<(int Generated, int Skipped)> GenerateForAllSchedulesAsync(string dbFilePath, int year, int month)
+    {
+        var schedules = await GetSchedulesAsync(dbFilePath);
+        int generated = 0, skipped = 0;
+        foreach (var s in schedules.Where(s => s.IsActive))
+        {
+            try
+            {
+                await GeneratePaymentsForMonthAsync(dbFilePath, s.Id, year, month);
+                generated++;
+            }
+            catch (InvalidOperationException)
+            {
+                skipped++;
+            }
+        }
+        return (generated, skipped);
+    }
 }
