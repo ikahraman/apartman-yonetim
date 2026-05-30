@@ -2,16 +2,16 @@
 
 <MudPaper Elevation="1" Class="mb-4 px-2 py-1">
     <MudStack Spacing="1">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="pt-1 px-1">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="flex-wrap:wrap" Class="pt-1 px-1">
             <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Primary" />
-            <MudText Typo="Typo.h6" Style="font-weight:700">@SiteName</MudText>
+            <MudText Typo="Typo.h6" Style="font-weight:700;white-space:nowrap">@SiteName</MudText>
             @if (City is not null)
             {
                 <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.LocationOn">@City</MudChip>
             }
             <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Home">@UnitCount Daire</MudChip>
         </MudStack>
-        <MudStack Row="true" Spacing="0" Style="flex-wrap:nowrap;overflow-x:auto">
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;padding-bottom:2px">
             @foreach (var (label, icon, route) in _modules)
             {
                 var r = route;
@@ -20,11 +20,12 @@
                            Variant="@(active ? Variant.Filled : Variant.Text)"
                            Color="@(active ? Color.Primary : Color.Default)"
                            OnClick="@(() => Navigate(r))"
+                           Style="white-space:nowrap;min-width:auto"
                            Class="mr-1">
                     @label
                 </MudButton>
             }
-        </MudStack>
+        </div>
     </MudStack>
 </MudPaper>
 

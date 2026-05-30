@@ -28,12 +28,13 @@
         </AuthorizeView>
     </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always">
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="2" ClipMode="DrawerClipMode.Always"
+               Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md">
         <NavMenu />
     </MudDrawer>
 
     <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+        <MudContainer MaxWidth="MaxWidth.False" Class="pa-3 pa-sm-4">
             @Body
         </MudContainer>
     </MudMainContent>
