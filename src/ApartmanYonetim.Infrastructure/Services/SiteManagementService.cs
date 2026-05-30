@@ -4,7 +4,7 @@ using ApartmanYonetim.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 namespace ApartmanYonetim.Infrastructure.Services;
 
-public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factory) : ISiteManagementService
+public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factory, FirmDbContextFactory firmFactory) : ISiteManagementService
 {
     private static SiteDto ToDto(SiteProfile s) =>
         new(s.Id, s.CompanyId, s.Company?.Name ?? "", s.Name, s.Slug, s.Address, s.City, s.UnitCount, s.DbFilePath, s.IsActive,
@@ -71,5 +71,11 @@ public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factor
         foreach (var siteId in siteIds)
             db.UserSiteAccess.Add(new UserSiteAccess { UserId = userId, SiteId = siteId });
         await db.SaveChangesAsync();
+    }
+
+    public async Task<List<SiteDto>> GetAllByFirmSlugAsync(string firmSlug)
+    {
+        await using var firmDb = firmFactory.CreateBySlug(firmSlug);
+        return await firmDb.Sites.Include(s => s.Company).OrderBy(s => s.Name).Select(s => ToDto(s)).ToListAsync();
     }
 }

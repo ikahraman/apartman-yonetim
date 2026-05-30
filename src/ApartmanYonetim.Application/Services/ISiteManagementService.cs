@@ -15,4 +15,5 @@ public interface ISiteManagementService
     Task UpdateAsync(Guid id, SiteCommand cmd);
     Task<List<Guid>> GetUserSiteIdsAsync(string userId);
     Task SetUserSiteAccessAsync(string userId, List<Guid> siteIds);
+    Task<List<SiteDto>> GetAllByFirmSlugAsync(string firmSlug);
 }

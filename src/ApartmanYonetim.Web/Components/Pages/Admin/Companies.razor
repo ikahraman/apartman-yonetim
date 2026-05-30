@@ -1,57 +1,139 @@
 @page "/admin/firmalar"
 @attribute [Authorize(Roles = "SuperAdmin")]
 @inject IFirmRegistrationService FirmService
+@inject ISiteManagementService SiteService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject NavigationManager Nav
 
 <PageTitle>Yönetim Firmaları</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
         <MudText Typo="Typo.h5" Style="font-weight:700">Yönetim Firmaları</MudText>
         <MudSpacer />
         <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">Firma Ekle</MudButton>
     </MudStack>
 
-    <MudTable T="FirmRegDto" Items="_firms" Hover="true" Elevation="1">
-        <HeaderContent>
-            <MudTh>Firma Adı</MudTh>
-            <MudTh>Slug</MudTh>
-            <MudTh>Durum</MudTh>
-            <MudTh>Oluşturulma</MudTh>
-            <MudTh></MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd><MudText Style="font-weight:500">@context.Name</MudText></MudTd>
-            <MudTd><MudText Typo="Typo.caption">@context.Slug</MudText></MudTd>
-            <MudTd>
-                <MudChip T="string" Size="Size.Small" Color="@(context.IsActive ? Color.Success : Color.Default)">
-                    @(context.IsActive ? "Aktif" : "Pasif")
-                </MudChip>
-            </MudTd>
-            <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</MudTd>
-            <MudTd>
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="() => OpenEditDialog(context)" />
-            </MudTd>
-        </RowTemplate>
-    </MudTable>
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_firms.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Henüz firma kaydı bulunmuyor.</MudAlert>
+    }
+    else
+    {
+        @foreach (var firm in _firms)
+        {
+            var f = firm;
+            var sites = _sitesByFirm.GetValueOrDefault(f.Slug) ?? [];
+            var expiredCount = sites.Count(s => s.ContractEndDate.HasValue && s.ContractEndDate.Value < DateOnly.FromDateTime(DateTime.Today));
+            var warnCount = sites.Count(s => s.ContractEndDate.HasValue && s.ContractEndDate.Value >= DateOnly.FromDateTime(DateTime.Today)
+                && (s.ContractEndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days <= 90);
+
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                    <MudAvatar Color="@(f.IsActive ? Color.Primary : Color.Default)" Size="Size.Medium">
+                        <MudIcon Icon="@Icons.Material.Filled.Business" />
+                    </MudAvatar>
+                    <MudStack Spacing="0" Style="flex:1">
+                        <MudText Typo="Typo.h6" Style="font-weight:700">@f.Name</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@f.Slug · Kayıt: @f.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</MudText>
+                    </MudStack>
+                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Filled"
+                                 Color="@(f.IsActive ? Color.Success : Color.Default)">
+                            @(f.IsActive ? "Aktif" : "Pasif")
+                        </MudChip>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@sites.Count Site</MudChip>
+                        @if (expiredCount > 0)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Error"
+                                     Icon="@Icons.Material.Filled.Warning">@expiredCount sözleşme doldu</MudChip>
+                        }
+                        @if (warnCount > 0)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Warning"
+                                     Icon="@Icons.Material.Filled.Schedule">@warnCount yaklaşan</MudChip>
+                        }
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                       OnClick="() => OpenEditDialog(f)" />
+                    </MudStack>
+                </MudStack>
+
+                @if (sites.Count == 0)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="ml-2">Bu firmaya ait site bulunmuyor.</MudText>
+                }
+                else
+                {
+                    <MudGrid Spacing="2">
+                        @foreach (var site in sites)
+                        {
+                            var s = site;
+                            var daysLeft = s.ContractEndDate.HasValue
+                                ? (s.ContractEndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days
+                                : (int?)null;
+
+                            <MudItem xs="12" sm="6" md="4" lg="3">
+                                <MudPaper Outlined="true" Class="pa-3" Style="cursor:pointer"
+                                          @onclick="@(() => Nav.NavigateTo($"/site/{s.Id}/ozet"))">
+                                    <MudStack Spacing="1">
+                                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudIcon Icon="@Icons.Material.Filled.Apartment" Size="Size.Small"
+                                                     Color="@(daysLeft is <= 30 ? Color.Error : daysLeft is <= 90 ? Color.Warning : Color.Primary)" />
+                                            <MudText Typo="Typo.body1" Style="font-weight:600">@s.Name</MudText>
+                                        </MudStack>
+                                        @if (s.City is not null)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@s.City · @s.UnitCount daire</MudText>
+                                        }
+                                        @if (daysLeft.HasValue && daysLeft <= 90)
+                                        {
+                                            <MudText Typo="Typo.caption"
+                                                     Style="@(daysLeft <= 30 ? "color:var(--mud-palette-error)" : "color:var(--mud-palette-warning)")">
+                                                @(daysLeft <= 0 ? "⚠ Sözleşme doldu!" : $"⚠ {daysLeft} gün kaldı")
+                                            </MudText>
+                                        }
+                                    </MudStack>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+            </MudPaper>
+        }
+    }
 </MudContainer>
 
 @code {
     private List<FirmRegDto> _firms = [];
+    private Dictionary<string, List<SiteDto>> _sitesByFirm = new();
+    private bool _loading = true;
 
-    protected override async Task OnInitializedAsync() => _firms = await FirmService.GetAllAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _firms = await FirmService.GetAllAsync();
+        foreach (var firm in _firms)
+        {
+            try { _sitesByFirm[firm.Slug] = await SiteService.GetAllByFirmSlugAsync(firm.Slug); }
+            catch { _sitesByFirm[firm.Slug] = []; }
+        }
+        _loading = false;
+    }
 
     private async Task OpenAddDialog()
     {
         var dialog = await DialogService.ShowAsync<CompanyFormDialog>("Firma Ekle", new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        if (!(await dialog.Result)!.Canceled) _firms = await FirmService.GetAllAsync();
+        if (!(await dialog.Result)!.Canceled) await OnInitializedAsync();
     }
 
     private async Task OpenEditDialog(FirmRegDto firm)
     {
         var p = new DialogParameters<CompanyFormDialog> { { x => x.Firm, firm } };
         var dialog = await DialogService.ShowAsync<CompanyFormDialog>("Firma Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        if (!(await dialog.Result)!.Canceled) _firms = await FirmService.GetAllAsync();
+        if (!(await dialog.Result)!.Canceled) await OnInitializedAsync();
     }
 }
