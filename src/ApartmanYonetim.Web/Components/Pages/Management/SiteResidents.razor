@@ -123,15 +123,7 @@
 
     private async Task OpenResidentDialog(UnitSummaryDto unit)
     {
-        var auth = await AuthState;
-        var firmSlug = auth.User.FindFirst("firm_slug")?.Value ?? "";
-        var p = new DialogParameters<ResidentFormDialog>
-        {
-            { x => x.Unit, unit },
-            { x => x.DbFilePath, _site!.DbFilePath },
-            { x => x.SiteId, SiteId },
-            { x => x.FirmSlug, firmSlug }
-        };
+        var p = new DialogParameters<ResidentFormDialog> { { x => x.Unit, unit }, { x => x.DbFilePath, _site!.DbFilePath } };
         var dialog = await DialogService.ShowAsync<ResidentFormDialog>(unit.ResidentId is null ? "Sakin Ekle" : "Sakin Güncelle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         if (!(await dialog.Result)!.Canceled) await Reload();
     }

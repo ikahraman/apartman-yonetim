@@ -84,12 +84,6 @@ else
         _displayName = user.FindFirst("DisplayName")?.Value ?? user.Identity?.Name ?? "";
         var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
 
-        if (user.IsInRole("Resident"))
-        {
-            Nav.NavigateTo("/sakin");
-            return;
-        }
-
         if (user.IsInRole("SuperAdmin"))
         {
             Nav.NavigateTo("/admin/firmalar");

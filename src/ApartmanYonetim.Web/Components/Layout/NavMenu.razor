@@ -10,16 +10,6 @@
                 </MudNavGroup>
             </AuthorizeView>
 
-            <AuthorizeView Roles="Resident" Context="_">
-                <MudDivider Class="my-2" />
-                <MudNavGroup Title="Sakin Portali" Icon="@Icons.Material.Filled.Home" Expanded="true">
-                    <MudNavLink Href="/sakin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Ana Sayfa</MudNavLink>
-                    <MudNavLink Href="/sakin/duyurular" Icon="@Icons.Material.Filled.Campaign">Duyurular</MudNavLink>
-                    <MudNavLink Href="/sakin/aidatlar" Icon="@Icons.Material.Filled.Receipt">Aidatlarım</MudNavLink>
-                    <MudNavLink Href="/sakin/talepler" Icon="@Icons.Material.Filled.Build">Bakım Taleplerim</MudNavLink>
-                    <MudNavLink Href="/sakin/profil" Icon="@Icons.Material.Filled.Person">Profilim</MudNavLink>
-                </MudNavGroup>
-            </AuthorizeView>
 
             <AuthorizeView Roles="SuperAdmin" Context="_">
                 <MudDivider Class="my-2" />

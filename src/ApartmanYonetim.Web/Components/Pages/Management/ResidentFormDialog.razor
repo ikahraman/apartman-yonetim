@@ -1,48 +1,28 @@
 @inject ISiteResidentService ResidentService
-@inject UserManager<AppUser> UserManager
-@inject RoleManager<IdentityRole> RoleManager
 
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="3">
-            @if (_createdCredentials is not null)
-            {
-                <MudAlert Severity="Severity.Success" Icon="@Icons.Material.Filled.PersonAdd">
-                    <MudText Typo="Typo.body2" Style="font-weight:600">Sakin portal hesabı oluşturuldu!</MudText>
-                    <MudText Typo="Typo.body2">Kullanıcı adı: <strong>@_createdCredentials.Value.Username</strong></MudText>
-                    <MudText Typo="Typo.body2">Şifre: <strong>@_createdCredentials.Value.Password</strong></MudText>
-                </MudAlert>
-            }
-            else
-            {
-                <MudTextField @bind-Value="_firstName" Label="Ad" Required="true" Variant="Variant.Outlined" />
-                <MudTextField @bind-Value="_lastName" Label="Soyad" Required="true" Variant="Variant.Outlined" />
-                <MudTextField @bind-Value="_phone" Label="Telefon" Variant="Variant.Outlined" InputType="InputType.Telephone" />
-                <MudTextField @bind-Value="_email" Label="E-posta" Variant="Variant.Outlined" InputType="InputType.Email" />
-                <MudSelect @bind-Value="_residencyType" Label="Oturma Türü" Variant="Variant.Outlined" Required="true">
-                    <MudSelectItem Value="ResidencyType.Owner">Mal Sahibi</MudSelectItem>
-                    <MudSelectItem Value="ResidencyType.Tenant">Kiracı</MudSelectItem>
-                    <MudSelectItem Value="ResidencyType.Family">Aile Üyesi</MudSelectItem>
-                </MudSelect>
-                <MudDatePicker @bind-Date="_moveInDate" Label="Giriş Tarihi" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
-                <MudTextField @bind-Value="_notes" Label="Notlar" Variant="Variant.Outlined" Lines="2" />
-                @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
-            }
+            <MudTextField @bind-Value="_firstName" Label="Ad" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_lastName" Label="Soyad" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_phone" Label="Telefon" Variant="Variant.Outlined" InputType="InputType.Telephone" />
+            <MudTextField @bind-Value="_email" Label="E-posta" Variant="Variant.Outlined" InputType="InputType.Email" />
+            <MudSelect @bind-Value="_residencyType" Label="Oturma Türü" Variant="Variant.Outlined" Required="true">
+                <MudSelectItem Value="ResidencyType.Owner">Mal Sahibi</MudSelectItem>
+                <MudSelectItem Value="ResidencyType.Tenant">Kiracı</MudSelectItem>
+                <MudSelectItem Value="ResidencyType.Family">Aile Üyesi</MudSelectItem>
+            </MudSelect>
+            <MudDatePicker @bind-Date="_moveInDate" Label="Giriş Tarihi" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+            <MudTextField @bind-Value="_notes" Label="Notlar" Variant="Variant.Outlined" Lines="2" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
         </MudStack>
     </DialogContent>
     <DialogActions>
-        @if (_createdCredentials is not null)
-        {
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => MudDialog.Close(DialogResult.Ok(true)))">Tamam</MudButton>
-        }
-        else
-        {
-            <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
-                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
-                Kaydet
-            </MudButton>
-        }
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
     </DialogActions>
 </MudDialog>
 
@@ -50,8 +30,6 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public string DbFilePath { get; set; } = "";
     [Parameter] public UnitSummaryDto Unit { get; set; } = default!;
-    [Parameter] public Guid SiteId { get; set; }
-    [Parameter] public string FirmSlug { get; set; } = "";
 
     private string _firstName = "";
     private string _lastName = "";
@@ -62,7 +40,6 @@
     private string? _notes;
     private string? _error;
     private bool _busy;
-    private (string Username, string Password)? _createdCredentials;
 
     protected override void OnParametersSet()
     {
@@ -88,24 +65,8 @@
 
             if (Unit.ResidentId is null)
             {
-                var resident = await ResidentService.AddResidentAsync(DbFilePath, Unit.Id, cmd);
-
-                // Auto-create portal account for new resident
-                var count = UserManager.Users.Count(u => u.UserName != null && u.UserName.StartsWith("sakin-"));
-                var username = $"sakin-{count + 1}";
-                var password = "Sakin1234!";
-                var user = new AppUser { UserName = username, Email = _email, DisplayName = $"{_firstName.Trim()} {_lastName.Trim()}", FirmSlug = FirmSlug, SiteId = SiteId };
-                var result = await UserManager.CreateAsync(user, password);
-                if (result.Succeeded)
-                {
-                    await UserManager.AddToRoleAsync(user, "Resident");
-                    await ResidentService.SetResidentUserIdAsync(DbFilePath, resident.Id, user.Id);
-                    _createdCredentials = (username, password);
-                }
-                else
-                {
-                    MudDialog.Close(DialogResult.Ok(true));
-                }
+                await ResidentService.AddResidentAsync(DbFilePath, Unit.Id, cmd);
+                MudDialog.Close(DialogResult.Ok(true));
             }
             else
             {
