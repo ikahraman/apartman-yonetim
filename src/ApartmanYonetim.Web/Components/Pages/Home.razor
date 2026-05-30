@@ -22,65 +22,68 @@ else if (_sites.Count == 0)
 }
 else
 {
-    <MudGrid Spacing="3">
-        @foreach (var site in _sites)
-        {
-            var s = site;
-            <MudItem xs="12" sm="6" md="4">
-                <MudCard Elevation="2" Style="cursor:pointer" @onclick="@(() => GoToSite(s.Id))">
-                    <MudCardHeader>
-                        <CardHeaderAvatar>
-                            <MudAvatar Color="Color.Primary">
-                                <MudIcon Icon="@Icons.Material.Filled.Apartment" />
-                            </MudAvatar>
-                        </CardHeaderAvatar>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6" Style="font-weight:600">@s.Name</MudText>
-                            <MudText Typo="Typo.caption" Color="Color.Secondary">@s.CompanyName</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        <MudStack Spacing="1">
-                            @if (s.City is not null)
-                            {
+    @foreach (var group in _sites.GroupBy(s => s.CompanyName).OrderBy(g => g.Key))
+    {
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3 mt-2">
+            <MudAvatar Color="Color.Primary" Size="Size.Small">
+                <MudIcon Icon="@Icons.Material.Filled.Business" />
+            </MudAvatar>
+            <MudText Typo="Typo.h6" Style="font-weight:700">@group.Key</MudText>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@group.Count() Site</MudChip>
+        </MudStack>
+
+        <MudGrid Spacing="3" Class="mb-5">
+            @foreach (var site in group)
+            {
+                var s = site;
+                var daysLeft = s.ContractEndDate.HasValue
+                    ? (s.ContractEndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days
+                    : (int?)null;
+
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Elevation="2" Style="cursor:pointer" @onclick="@(() => GoToSite(s.Id))">
+                        <MudCardHeader>
+                            <CardHeaderAvatar>
+                                <MudAvatar Color="@(daysLeft is <= 30 ? Color.Error : daysLeft is <= 90 ? Color.Warning : Color.Primary)">
+                                    <MudIcon Icon="@Icons.Material.Filled.Apartment" />
+                                </MudAvatar>
+                            </CardHeaderAvatar>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6" Style="font-weight:600">@s.Name</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@s.City</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudStack Spacing="1">
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Color="Color.Secondary" />
-                                    <MudText Typo="Typo.body2">@s.City</MudText>
+                                    <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Small" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.body2">@s.UnitCount Daire</MudText>
                                 </MudStack>
-                            }
-                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Small" Color="Color.Secondary" />
-                                <MudText Typo="Typo.body2">@s.UnitCount Daire</MudText>
+                                @if (daysLeft.HasValue && daysLeft <= 90)
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small"
+                                                 Color="@(daysLeft <= 30 ? Color.Error : Color.Warning)" />
+                                        <MudText Typo="Typo.caption"
+                                                 Style="@(daysLeft <= 30 ? "color:var(--mud-palette-error)" : "color:var(--mud-palette-warning)")">
+                                            @(daysLeft <= 0 ? "Sözleşme süresi doldu!" : $"Sözleşme {daysLeft} gün sonra bitiyor")
+                                        </MudText>
+                                    </MudStack>
+                                }
                             </MudStack>
-                            @if (s.Address is not null)
-                            {
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@s.Address</MudText>
-                            }
-                        </MudStack>
-                    </MudCardContent>
-                    <MudCardActions>
-                        @if (s.ContractEndDate.HasValue)
-                        {
-                            var d = (s.ContractEndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days;
-                            @if (d <= 90)
-                            {
-                                <MudChip T="string" Size="Size.Small" Color="@(d <= 30 ? Color.Error : Color.Warning)"
-                                         Icon="@Icons.Material.Filled.Warning">
-                                    @(d <= 0 ? "Sözleşme doldu!" : $"Sözleşme: {d} gün")
-                                </MudChip>
-                            }
-                        }
-                        <MudSpacer />
-                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                                   StartIcon="@Icons.Material.Filled.ManageAccounts"
-                                   OnClick="@(() => GoToSite(s.Id))">
-                            Yönet
-                        </MudButton>
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
-        }
-    </MudGrid>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.ManageAccounts"
+                                       OnClick="@(() => GoToSite(s.Id))">
+                                Yönet
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
 }
 
 @code {
