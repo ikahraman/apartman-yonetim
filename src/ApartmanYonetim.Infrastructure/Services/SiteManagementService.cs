@@ -4,7 +4,7 @@ using ApartmanYonetim.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 namespace ApartmanYonetim.Infrastructure.Services;
 
-public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factory, FirmDbContextFactory firmFactory) : ISiteManagementService
+public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factory, FirmDbContextFactory firmFactory, MainDbContext mainDb) : ISiteManagementService
 {
     private static SiteDto ToDto(SiteProfile s) =>
         new(s.Id, s.CompanyId, s.Company?.Name ?? "", s.Name, s.Slug, s.Address, s.City, s.UnitCount, s.DbFilePath, s.IsActive,
@@ -29,7 +29,21 @@ public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factor
     public async Task<SiteDto?> GetByIdAsync(Guid id)
     {
         var s = await db.Sites.Include(s => s.Company).FirstOrDefaultAsync(s => s.Id == id);
-        return s is null ? null : ToDto(s);
+        if (s is not null) return ToDto(s);
+
+        // SuperAdmin fallback: current FirmDbContext is in-memory (empty), search all firm databases.
+        var slugs = await mainDb.FirmRegistrations.Select(f => f.Slug).ToListAsync();
+        foreach (var slug in slugs)
+        {
+            try
+            {
+                await using var firmDb = firmFactory.CreateBySlug(slug);
+                var site = await firmDb.Sites.Include(x => x.Company).FirstOrDefaultAsync(x => x.Id == id);
+                if (site is not null) return ToDto(site);
+            }
+            catch { }
+        }
+        return null;
     }
 
     public async Task<SiteDto> CreateAsync(SiteCommand cmd)
