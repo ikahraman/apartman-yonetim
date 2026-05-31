@@ -21,35 +21,26 @@
         <MudTable T="AdminSiteDto" Items="_sites" Hover="true" Elevation="1" Dense="true">
             <HeaderContent>
                 <MudTh>Site Adı</MudTh>
+                <MudTh>Tip</MudTh>
                 <MudTh>Firma</MudTh>
                 <MudTh>Şehir</MudTh>
                 <MudTh>Daire</MudTh>
-                <MudTh>Sözleşme Başlangıç</MudTh>
                 <MudTh>Sözleşme Bitiş</MudTh>
-                <MudTh>Yönetim Ücreti</MudTh>
                 <MudTh>Durum</MudTh>
                 <MudTh></MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd>
                     <MudText Style="font-weight:500">@context.Name</MudText>
-                    @if (!string.IsNullOrWhiteSpace(context.ContractNotes))
-                    {
-                        <MudTooltip Text="@context.ContractNotes">
-                            <MudIcon Icon="@Icons.Material.Filled.Notes" Size="Size.Small" Color="Color.Default" Class="ml-1" Style="vertical-align:middle;opacity:0.5" />
-                        </MudTooltip>
-                    }
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@SiteTypeColor(context.SiteType)">
+                        @SiteTypeLabel(context.SiteType)
+                    </MudChip>
                 </MudTd>
                 <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Info">@context.FirmName</MudChip></MudTd>
                 <MudTd>@(context.City ?? "—")</MudTd>
-                <MudTd>@context.UnitCount</MudTd>
-                <MudTd>
-                    @if (context.ContractStartDate.HasValue)
-                    {
-                        <MudText Typo="Typo.body2">@context.ContractStartDate.Value.ToString("dd.MM.yyyy")</MudText>
-                    }
-                    else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
-                </MudTd>
+                <MudTd>@(context.UnitCount > 0 ? context.UnitCount.ToString() : "—")</MudTd>
                 <MudTd>
                     @if (context.ContractEndDate.HasValue)
                     {
@@ -57,16 +48,7 @@
                         var isExpiringSoon = !isExpired && context.ContractEndDate.Value < DateOnly.FromDateTime(DateTime.Today.AddDays(60));
                         <MudText Typo="Typo.body2" Color="@(isExpired ? Color.Error : isExpiringSoon ? Color.Warning : Color.Default)">
                             @context.ContractEndDate.Value.ToString("dd.MM.yyyy")
-                            @if (isExpired) { <span> ⚠ Süresi Doldu</span> }
-                            else if (isExpiringSoon) { <span> ⚠ Yaklaşıyor</span> }
                         </MudText>
-                    }
-                    else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
-                </MudTd>
-                <MudTd>
-                    @if (context.MonthlyManagementFee.HasValue)
-                    {
-                        <MudText Typo="Typo.body2">@context.MonthlyManagementFee.Value.ToString("N0") ₺</MudText>
                     }
                     else { <MudText Typo="Typo.body2" Color="Color.Default">—</MudText> }
                 </MudTd>
@@ -76,7 +58,19 @@
                     </MudChip>
                 </MudTd>
                 <MudTd>
-                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Color="Color.Secondary" Href="@($"/site/{context.Id}/sakinler")" />
+                    <MudStack Row="true" Spacing="0">
+                        @if (context.SiteType != SiteType.Apartman)
+                        {
+                            <MudTooltip Text="Yapı yönetimi (blok/kısım)">
+                                <MudIconButton Icon="@Icons.Material.Filled.AccountTree" Size="Size.Small" Color="Color.Primary"
+                                               OnClick="() => OpenStructureDialog(context)" />
+                            </MudTooltip>
+                        }
+                        <MudTooltip Text="Sakinler">
+                            <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Color="Color.Secondary"
+                                           Href="@($"/site/{context.Id}/sakinler")" />
+                        </MudTooltip>
+                    </MudStack>
                 </MudTd>
             </RowTemplate>
         </MudTable>
@@ -98,11 +92,41 @@
         var firms = await FirmService.GetAllAsync();
         var p = new DialogParameters<AdminSiteFormDialog> { { x => x.Firms, firms } };
         var dialog = await DialogService.ShowAsync<AdminSiteFormDialog>("Site Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
-        if (!(await dialog.Result)!.Canceled)
+        var result = await dialog.Result;
+        if (result is { Canceled: false, Data: AdminSiteDto created })
         {
             _loading = true;
             _sites = await FirmService.GetAllSitesAsync();
             _loading = false;
+
+            if (created.SiteType != SiteType.Apartman)
+                await OpenStructureDialog(created);
         }
     }
+
+    private async Task OpenStructureDialog(AdminSiteDto site)
+    {
+        var p = new DialogParameters<SiteBlocksDialog>
+        {
+            { x => x.DbFilePath, site.DbFilePath },
+            { x => x.SiteType, site.SiteType }
+        };
+        await DialogService.ShowAsync<SiteBlocksDialog>(
+            $"{site.Name} — Yapı Yönetimi", p,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private static Color SiteTypeColor(SiteType t) => t switch
+    {
+        SiteType.Apartman => Color.Default,
+        SiteType.TopluYapi => Color.Warning,
+        _ => Color.Primary
+    };
+
+    private static string SiteTypeLabel(SiteType t) => t switch
+    {
+        SiteType.Apartman => "Apartman",
+        SiteType.TopluYapi => "Toplu Yapı",
+        _ => "Site"
+    };
 }

@@ -1,6 +1,7 @@
 using ApartmanYonetim.Application.Services;
 using ApartmanYonetim.Domain.Entities;
 using ApartmanYonetim.Domain.Entities.Site;
+using ApartmanYonetim.Domain.Enums;
 using ApartmanYonetim.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 namespace ApartmanYonetim.Infrastructure.Services;
@@ -56,7 +57,7 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
                 foreach (var s in sites)
                     result.Add(new AdminSiteDto(s.Id, s.CompanyId, firm.Slug, firm.Name, s.Name, s.Slug,
                         s.City, s.UnitCount, s.DbFilePath, s.IsActive,
-                        s.ContractStartDate, s.ContractEndDate, s.MonthlyManagementFee, s.ContractNotes));
+                        s.ContractStartDate, s.ContractEndDate, s.MonthlyManagementFee, s.ContractNotes, s.SiteType));
             }
             catch { /* skip firm if db not accessible */ }
         }
@@ -80,11 +81,14 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
         firmDb.Sites.Add(site);
         await firmDb.SaveChangesAsync();
         await using var siteDb = await siteFactory.CreateAndMigrateAsync(dbPath);
-        for (var i = 1; i <= cmd.UnitCount; i++)
-            siteDb.Units.Add(new SiteUnit { Number = i.ToString() });
-        await siteDb.SaveChangesAsync();
+        if (cmd.SiteType == SiteType.Apartman && cmd.UnitCount > 0)
+        {
+            for (var i = 1; i <= cmd.UnitCount; i++)
+                siteDb.Units.Add(new SiteUnit { Number = i.ToString() });
+            await siteDb.SaveChangesAsync();
+        }
         return new AdminSiteDto(site.Id, site.CompanyId, firmSlug, company.Name, site.Name, site.Slug,
             site.City, site.UnitCount, site.DbFilePath, site.IsActive,
-            site.ContractStartDate, site.ContractEndDate, site.MonthlyManagementFee, site.ContractNotes);
+            site.ContractStartDate, site.ContractEndDate, site.MonthlyManagementFee, site.ContractNotes, site.SiteType);
     }
 }
