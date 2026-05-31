@@ -1,3 +1,4 @@
+using ApartmanYonetim.Domain.Enums;
 namespace ApartmanYonetim.Domain.Entities;
 
 public class SiteProfile
@@ -10,6 +11,7 @@ public class SiteProfile
     public string? Address { get; set; }
     public string? City { get; set; }
     public int UnitCount { get; set; }
+    public SiteType SiteType { get; set; } = SiteType.Site;
     public string DbFilePath { get; set; } = default!;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -4,6 +4,7 @@ namespace ApartmanYonetim.Infrastructure.Persistence;
 
 public class SiteDbContext(DbContextOptions<SiteDbContext> options) : DbContext(options)
 {
+    public DbSet<SiteKisim> Kisimlar => Set<SiteKisim>();
     public DbSet<SiteBlock> Blocks => Set<SiteBlock>();
     public DbSet<SiteUnit> Units => Set<SiteUnit>();
     public DbSet<SiteResident> Residents => Set<SiteResident>();
@@ -18,6 +19,7 @@ public class SiteDbContext(DbContextOptions<SiteDbContext> options) : DbContext(
     protected override void OnModelCreating(ModelBuilder m)
     {
         base.OnModelCreating(m);
+        m.Entity<SiteKisim>(b => b.HasMany(k => k.Blocks).WithOne(bl => bl.Kisim).HasForeignKey(bl => bl.KisimId).OnDelete(DeleteBehavior.SetNull));
         m.Entity<SiteUnit>(b => b.HasOne(u => u.BlockRef).WithMany(bl => bl.Units).HasForeignKey(u => u.BlockId).OnDelete(DeleteBehavior.SetNull));
         m.Entity<SiteResident>(b => b.HasIndex(r => r.UnitId));
         m.Entity<SiteFeePayment>(b =>

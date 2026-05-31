@@ -12,6 +12,11 @@
             </MudSelect>
             <MudTextField @bind-Value="_name" Label="Site Adı" Required="true" Variant="Variant.Outlined" />
             <MudTextField @bind-Value="_slug" Label="Slug" Required="true" Variant="Variant.Outlined" />
+            <MudSelect @bind-Value="_siteType" Label="Site Tipi" Variant="Variant.Outlined">
+                <MudSelectItem Value="SiteType.Apartman">Apartman (tek bina)</MudSelectItem>
+                <MudSelectItem Value="SiteType.Site">Site (çok bloklu)</MudSelectItem>
+                <MudSelectItem Value="SiteType.TopluYapi">Toplu Yapı (KMK 66-72)</MudSelectItem>
+            </MudSelect>
             <MudGrid Spacing="2">
                 <MudItem xs="6">
                     <MudTextField @bind-Value="_city" Label="Şehir" Variant="Variant.Outlined" />
@@ -52,6 +57,7 @@
     private string _firmSlug = "";
     private string _name = "";
     private string _slug = "";
+    private SiteType _siteType = SiteType.Site;
     private string? _city;
     private string? _address;
     private int _unitCount = 1;
@@ -78,7 +84,7 @@
                 Guid.Empty, _name.Trim(), _slug.Trim().ToLower(), _address, _city, _unitCount,
                 _contractStartDate.HasValue ? DateOnly.FromDateTime(_contractStartDate.Value) : null,
                 _contractEndDate.HasValue ? DateOnly.FromDateTime(_contractEndDate.Value) : null,
-                _monthlyManagementFee, _contractNotes);
+                _monthlyManagementFee, _contractNotes, _siteType);
             await FirmService.CreateSiteForFirmAsync(_firmSlug, cmd);
             MudDialog.Close(DialogResult.Ok(true));
         }

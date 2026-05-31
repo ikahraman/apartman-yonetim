@@ -113,28 +113,64 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
             r.Phone, r.Email, r.ResidencyType, r.MoveInDate, r.MoveOutDate, r.IsActive, r.Notes);
     }
 
+    public async Task<List<SiteKisimDto>> GetKisimlarAsync(string dbFilePath)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        return await db.Kisimlar.OrderBy(k => k.Name)
+            .Select(k => new SiteKisimDto(k.Id, k.Name, k.Code, k.Description))
+            .ToListAsync();
+    }
+
+    public async Task<SiteKisimDto> AddKisimAsync(string dbFilePath, SiteKisimCommand cmd)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var kisim = new SiteKisim { Name = cmd.Name, Code = cmd.Code, Description = cmd.Description };
+        db.Kisimlar.Add(kisim);
+        await db.SaveChangesAsync();
+        return new SiteKisimDto(kisim.Id, kisim.Name, kisim.Code, kisim.Description);
+    }
+
+    public async Task UpdateKisimAsync(string dbFilePath, Guid kisimId, SiteKisimCommand cmd)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var kisim = await db.Kisimlar.FindAsync(kisimId) ?? throw new InvalidOperationException("Kısım bulunamadı.");
+        kisim.Name = cmd.Name; kisim.Code = cmd.Code; kisim.Description = cmd.Description;
+        await db.SaveChangesAsync();
+    }
+
+    public async Task DeleteKisimAsync(string dbFilePath, Guid kisimId)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var kisim = await db.Kisimlar.FindAsync(kisimId) ?? throw new InvalidOperationException("Kısım bulunamadı.");
+        var blocks = await db.Blocks.Where(b => b.KisimId == kisimId).ToListAsync();
+        foreach (var b in blocks) b.KisimId = null;
+        db.Kisimlar.Remove(kisim);
+        await db.SaveChangesAsync();
+    }
+
     public async Task<List<SiteBlockDto>> GetBlocksAsync(string dbFilePath)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
-        return await db.Blocks.OrderBy(b => b.Name)
-            .Select(b => new SiteBlockDto(b.Id, b.Name, b.Code, b.FloorCount, b.UnitCount))
+        return await db.Blocks.Include(b => b.Kisim).OrderBy(b => b.Kisim!.Name).ThenBy(b => b.Name)
+            .Select(b => new SiteBlockDto(b.Id, b.Name, b.Code, b.FloorCount, b.UnitCount, b.KisimId, b.Kisim != null ? b.Kisim.Name : null))
             .ToListAsync();
     }
 
     public async Task<SiteBlockDto> AddBlockAsync(string dbFilePath, SiteBlockCommand cmd)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
-        var block = new SiteBlock { Name = cmd.Name, Code = cmd.Code, FloorCount = cmd.FloorCount, UnitCount = cmd.UnitCount };
+        var block = new SiteBlock { Name = cmd.Name, Code = cmd.Code, FloorCount = cmd.FloorCount, UnitCount = cmd.UnitCount, KisimId = cmd.KisimId };
         db.Blocks.Add(block);
         await db.SaveChangesAsync();
-        return new SiteBlockDto(block.Id, block.Name, block.Code, block.FloorCount, block.UnitCount);
+        return new SiteBlockDto(block.Id, block.Name, block.Code, block.FloorCount, block.UnitCount, block.KisimId);
     }
 
     public async Task UpdateBlockAsync(string dbFilePath, Guid blockId, SiteBlockCommand cmd)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var block = await db.Blocks.FindAsync(blockId) ?? throw new InvalidOperationException("Blok bulunamadı.");
-        block.Name = cmd.Name; block.Code = cmd.Code; block.FloorCount = cmd.FloorCount; block.UnitCount = cmd.UnitCount;
+        block.Name = cmd.Name; block.Code = cmd.Code; block.FloorCount = cmd.FloorCount;
+        block.UnitCount = cmd.UnitCount; block.KisimId = cmd.KisimId;
         await db.SaveChangesAsync();
     }
 
@@ -142,7 +178,6 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var block = await db.Blocks.FindAsync(blockId) ?? throw new InvalidOperationException("Blok bulunamadı.");
-        // Unlink units before deleting
         var units = await db.Units.Where(u => u.BlockId == blockId).ToListAsync();
         foreach (var u in units) u.BlockId = null;
         db.Blocks.Remove(block);

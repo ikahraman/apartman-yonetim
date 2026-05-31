@@ -1,9 +1,12 @@
+using ApartmanYonetim.Domain.Enums;
 namespace ApartmanYonetim.Application.Services;
 
 public record SiteDto(Guid Id, Guid CompanyId, string CompanyName, string Name, string Slug, string? Address, string? City, int UnitCount, string DbFilePath, bool IsActive,
-    DateOnly? ContractStartDate, DateOnly? ContractEndDate, decimal? MonthlyManagementFee, string? ContractNotes);
+    DateOnly? ContractStartDate, DateOnly? ContractEndDate, decimal? MonthlyManagementFee, string? ContractNotes,
+    SiteType SiteType = SiteType.Site);
 public record SiteCommand(Guid CompanyId, string Name, string Slug, string? Address, string? City, int UnitCount,
-    DateOnly? ContractStartDate, DateOnly? ContractEndDate, decimal? MonthlyManagementFee, string? ContractNotes);
+    DateOnly? ContractStartDate, DateOnly? ContractEndDate, decimal? MonthlyManagementFee, string? ContractNotes,
+    SiteType SiteType = SiteType.Site);
 
 public interface ISiteManagementService
 {

@@ -148,7 +148,7 @@
     private async Task OpenBlocksDialog()
     {
         if (_site is null) return;
-        var p = new DialogParameters<SiteBlocksDialog> { { x => x.DbFilePath, _site.DbFilePath } };
+        var p = new DialogParameters<SiteBlocksDialog> { { x => x.DbFilePath, _site.DbFilePath }, { x => x.SiteType, _site.SiteType } };
         var dialog = await DialogService.ShowAsync<SiteBlocksDialog>("Blok Yönetimi", p, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
         if (!(await dialog.Result)!.Canceled) await Reload();
     }

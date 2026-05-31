@@ -8,7 +8,7 @@ public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factor
 {
     private static SiteDto ToDto(SiteProfile s) =>
         new(s.Id, s.CompanyId, s.Company?.Name ?? "", s.Name, s.Slug, s.Address, s.City, s.UnitCount, s.DbFilePath, s.IsActive,
-            s.ContractStartDate, s.ContractEndDate, s.MonthlyManagementFee, s.ContractNotes);
+            s.ContractStartDate, s.ContractEndDate, s.MonthlyManagementFee, s.ContractNotes, s.SiteType);
 
     public async Task<List<SiteDto>> GetAllAsync()
         => await db.Sites.Include(s => s.Company).OrderBy(s => s.Name).Select(s => ToDto(s)).ToListAsync();
@@ -54,7 +54,7 @@ public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factor
         {
             CompanyId = cmd.CompanyId, Name = cmd.Name, Slug = cmd.Slug,
             Address = cmd.Address, City = cmd.City, UnitCount = cmd.UnitCount,
-            DbFilePath = dbPath,
+            SiteType = cmd.SiteType, DbFilePath = dbPath,
             ContractStartDate = cmd.ContractStartDate, ContractEndDate = cmd.ContractEndDate,
             MonthlyManagementFee = cmd.MonthlyManagementFee, ContractNotes = cmd.ContractNotes
         };
@@ -68,7 +68,7 @@ public class SiteManagementService(FirmDbContext db, SiteDbContextFactory factor
     public async Task UpdateAsync(Guid id, SiteCommand cmd)
     {
         var s = await db.Sites.FindAsync(id) ?? throw new InvalidOperationException("Site bulunamadı.");
-        s.Name = cmd.Name; s.Slug = cmd.Slug;
+        s.Name = cmd.Name; s.Slug = cmd.Slug; s.SiteType = cmd.SiteType;
         s.Address = cmd.Address; s.City = cmd.City; s.UnitCount = cmd.UnitCount;
         s.ContractStartDate = cmd.ContractStartDate; s.ContractEndDate = cmd.ContractEndDate;
         s.MonthlyManagementFee = cmd.MonthlyManagementFee; s.ContractNotes = cmd.ContractNotes;

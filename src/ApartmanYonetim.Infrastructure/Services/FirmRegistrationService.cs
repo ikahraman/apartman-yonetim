@@ -73,7 +73,7 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
         {
             CompanyId = company.Id, Name = cmd.Name, Slug = cmd.Slug,
             Address = cmd.Address, City = cmd.City, UnitCount = cmd.UnitCount,
-            DbFilePath = dbPath,
+            SiteType = cmd.SiteType, DbFilePath = dbPath,
             ContractStartDate = cmd.ContractStartDate, ContractEndDate = cmd.ContractEndDate,
             MonthlyManagementFee = cmd.MonthlyManagementFee, ContractNotes = cmd.ContractNotes
         };

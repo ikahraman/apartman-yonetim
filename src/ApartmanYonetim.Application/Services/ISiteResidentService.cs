@@ -9,8 +9,10 @@ public record UnitSummaryDto(
     UnitType UnitType = UnitType.Daire, decimal? ArsaPay = null,
     Guid? BlockId = null, string? BlockName = null);
 
-public record SiteBlockDto(Guid Id, string Name, string? Code, int? FloorCount, int? UnitCount);
-public record SiteBlockCommand(string Name, string? Code, int? FloorCount, int? UnitCount);
+public record SiteKisimDto(Guid Id, string Name, string? Code, string? Description);
+public record SiteKisimCommand(string Name, string? Code, string? Description);
+public record SiteBlockDto(Guid Id, string Name, string? Code, int? FloorCount, int? UnitCount, Guid? KisimId = null, string? KisimName = null);
+public record SiteBlockCommand(string Name, string? Code, int? FloorCount, int? UnitCount, Guid? KisimId = null);
 
 public record ResidentDto(
     Guid Id, Guid UnitId, string FirstName, string LastName, string FullName,
@@ -32,6 +34,11 @@ public interface ISiteResidentService
     Task MoveOutAsync(string dbFilePath, Guid residentId, DateOnly moveOutDate);
     Task SetResidentUserIdAsync(string dbFilePath, Guid residentId, string userId);
     Task<ResidentDto?> GetByUserIdAsync(string dbFilePath, string userId);
+
+    Task<List<SiteKisimDto>> GetKisimlarAsync(string dbFilePath);
+    Task<SiteKisimDto> AddKisimAsync(string dbFilePath, SiteKisimCommand cmd);
+    Task UpdateKisimAsync(string dbFilePath, Guid kisimId, SiteKisimCommand cmd);
+    Task DeleteKisimAsync(string dbFilePath, Guid kisimId);
 
     Task<List<SiteBlockDto>> GetBlocksAsync(string dbFilePath);
     Task<SiteBlockDto> AddBlockAsync(string dbFilePath, SiteBlockCommand cmd);

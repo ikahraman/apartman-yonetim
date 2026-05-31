@@ -7,5 +7,7 @@ public class SiteBlock
     public string? Code { get; set; }
     public int? FloorCount { get; set; }
     public int? UnitCount { get; set; }
+    public Guid? KisimId { get; set; }
+    public SiteKisim? Kisim { get; set; }
     public ICollection<SiteUnit> Units { get; set; } = [];
 }
