@@ -105,6 +105,12 @@ else
             return;
         }
 
+        if (user.IsInRole("Resident") && !user.IsInRole("Manager") && !user.IsInRole("SiteStaff"))
+        {
+            Nav.NavigateTo("/sakin");
+            return;
+        }
+
         _sites = await SiteService.GetForUserAsync(userId);
     }
 }

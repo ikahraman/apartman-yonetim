@@ -1,4 +1,5 @@
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthProvider
 
 <MudPaper Elevation="1" Class="mb-4 px-2 py-1">
     <MudStack Spacing="1">
@@ -12,8 +13,9 @@
             <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Home">@UnitCount Daire</MudChip>
         </MudStack>
         <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;padding-bottom:2px">
-            @foreach (var (label, icon, route) in _modules)
+            @foreach (var (label, icon, route, staffVisible) in _modules)
             {
+                @if (!staffVisible && _isSiteStaff) { continue; }
                 var r = route;
                 var active = route == ActiveRoute;
                 <MudButton StartIcon="@icon" Size="Size.Small"
@@ -36,16 +38,27 @@
     [Parameter] public int UnitCount { get; set; }
     [Parameter] public string ActiveRoute { get; set; } = "";
 
+    private bool _isSiteStaff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _isSiteStaff = auth.User.IsInRole("SiteStaff") &&
+                       !auth.User.IsInRole("Manager") &&
+                       !auth.User.IsInRole("SuperAdmin");
+    }
+
     private void Navigate(string route) => Nav.NavigateTo($"/site/{SiteId}/{route}");
 
-    private static readonly (string Label, string Icon, string Route)[] _modules =
+    // staffVisible: false = SiteStaff'a gizli
+    private static readonly (string Label, string Icon, string Route, bool StaffVisible)[] _modules =
     [
-        ("Özet", Icons.Material.Filled.Dashboard, "ozet"),
-        ("Sakinler", Icons.Material.Filled.People, "sakinler"),
-        ("Aidatlar", Icons.Material.Filled.AccountBalance, "aidatlar"),
-        ("Duyurular", Icons.Material.Filled.Notifications, "duyurular"),
-        ("Arızalar", Icons.Material.Filled.Build, "arizalar"),
-        ("Toplantılar", Icons.Material.Filled.Groups, "toplanti"),
-        ("Muhasebe", Icons.Material.Filled.ReceiptLong, "muhasebe"),
+        ("Özet",      Icons.Material.Filled.Dashboard,     "ozet",     true),
+        ("Sakinler",  Icons.Material.Filled.People,         "sakinler", true),
+        ("Aidatlar",  Icons.Material.Filled.AccountBalance, "aidatlar", false),
+        ("Duyurular", Icons.Material.Filled.Notifications,  "duyurular",true),
+        ("Arızalar",  Icons.Material.Filled.Build,          "arizalar", true),
+        ("Toplantılar",Icons.Material.Filled.Groups,        "toplanti", true),
+        ("Muhasebe",  Icons.Material.Filled.ReceiptLong,    "muhasebe", false),
     ];
 }

@@ -10,6 +10,11 @@
                 </MudNavGroup>
             </AuthorizeView>
 
+            <AuthorizeView Roles="Resident" Context="_">
+                <MudDivider Class="my-2" />
+                <MudNavLink Href="/sakin" Icon="@Icons.Material.Filled.Home">Sakin Portali</MudNavLink>
+            </AuthorizeView>
+
 
             <AuthorizeView Roles="SuperAdmin" Context="_">
                 <MudDivider Class="my-2" />
