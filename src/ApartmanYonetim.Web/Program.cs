@@ -76,9 +76,12 @@ builder.Services.AddScoped<FirmDbContext>(sp =>
     var factory = sp.GetRequiredService<FirmDbContextFactory>();
     if (!tenant.HasFirm)
     {
-        // Fallback for SuperAdmin (no firm): empty in-memory DB with schema so queries return empty results.
+        // SuperAdmin has no firm: use an open in-memory connection so EF Core never closes it
+        // between commands (closing :memory: destroys the database and drops the schema).
+        var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:");
+        connection.Open();
         var opts = new DbContextOptionsBuilder<FirmDbContext>()
-            .UseSqlite("Data Source=:memory:")
+            .UseSqlite(connection)
             .Options;
         var ctx = new FirmDbContext(opts);
         ctx.Database.EnsureCreated();
