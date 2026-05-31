@@ -15,6 +15,5 @@ RUN dotnet publish "src/ApartmanYonetim.Web/ApartmanYonetim.Web.csproj" -c Relea
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-RUN mkdir -p /app/data/sites
-VOLUME /app/data
+RUN mkdir -p /app/data/sites /app/data/FirmDatabases
 ENTRYPOINT ["dotnet", "ApartmanYonetim.Web.dll"]
