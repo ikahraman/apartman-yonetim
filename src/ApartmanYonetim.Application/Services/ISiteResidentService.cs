@@ -5,14 +5,20 @@ public record UnitSummaryDto(
     Guid Id, string Number, string? Block, int? Floor, decimal? SquareMeters,
     OccupancyType OccupancyType,
     Guid? ResidentId, string? ResidentName, string? ResidentPhone,
-    ResidencyType? ResidencyType, string? ResidentEmail = null);
+    ResidencyType? ResidencyType, string? ResidentEmail = null,
+    UnitType UnitType = UnitType.Daire, decimal? ArsaPay = null,
+    Guid? BlockId = null, string? BlockName = null);
+
+public record SiteBlockDto(Guid Id, string Name, string? Code, int? FloorCount, int? UnitCount);
+public record SiteBlockCommand(string Name, string? Code, int? FloorCount, int? UnitCount);
 
 public record ResidentDto(
     Guid Id, Guid UnitId, string FirstName, string LastName, string FullName,
     string? Phone, string? Email, ResidencyType ResidencyType,
     DateOnly MoveInDate, DateOnly? MoveOutDate, bool IsActive, string? Notes);
 
-public record AddUnitCommand(string Number, string? Block, int? Floor, decimal? SquareMeters);
+public record AddUnitCommand(string Number, string? Block, int? Floor, decimal? SquareMeters,
+    UnitType UnitType = UnitType.Daire, decimal? ArsaPay = null, Guid? BlockId = null);
 public record ResidentFormCommand(string FirstName, string LastName, string? Phone, string? Email, ResidencyType ResidencyType, DateOnly MoveInDate, string? Notes);
 
 public interface ISiteResidentService
@@ -26,4 +32,9 @@ public interface ISiteResidentService
     Task MoveOutAsync(string dbFilePath, Guid residentId, DateOnly moveOutDate);
     Task SetResidentUserIdAsync(string dbFilePath, Guid residentId, string userId);
     Task<ResidentDto?> GetByUserIdAsync(string dbFilePath, string userId);
+
+    Task<List<SiteBlockDto>> GetBlocksAsync(string dbFilePath);
+    Task<SiteBlockDto> AddBlockAsync(string dbFilePath, SiteBlockCommand cmd);
+    Task UpdateBlockAsync(string dbFilePath, Guid blockId, SiteBlockCommand cmd);
+    Task DeleteBlockAsync(string dbFilePath, Guid blockId);
 }

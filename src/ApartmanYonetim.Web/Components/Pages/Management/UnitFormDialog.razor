@@ -4,10 +4,43 @@
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="3">
-            <MudTextField @bind-Value="_number" Label="Daire No" Required="true" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_block" Label="Blok" Variant="Variant.Outlined" />
-            <MudNumericField @bind-Value="_floor" Label="Kat" Variant="Variant.Outlined" />
-            <MudNumericField @bind-Value="_sqm" Label="m²" Variant="Variant.Outlined" />
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_number" Label="Daire No" Required="true" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudSelect @bind-Value="_unitType" Label="Tür" Variant="Variant.Outlined">
+                        <MudSelectItem Value="UnitType.Daire">Daire</MudSelectItem>
+                        <MudSelectItem Value="UnitType.Dukkan">Dükkan</MudSelectItem>
+                        <MudSelectItem Value="UnitType.Depo">Depo</MudSelectItem>
+                        <MudSelectItem Value="UnitType.Otopark">Otopark</MudSelectItem>
+                        <MudSelectItem Value="UnitType.Sigınak">Sığınak</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+            @if (_blocks.Count > 0)
+            {
+                <MudSelect @bind-Value="_blockId" Label="Blok" Variant="Variant.Outlined" Clearable="true">
+                    @foreach (var b in _blocks)
+                    {
+                        <MudSelectItem Value="@((Guid?)b.Id)">@b.Name@(b.Code is not null ? $" ({b.Code})" : "")</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            else
+            {
+                <MudTextField @bind-Value="_block" Label="Blok (serbest metin)" Variant="Variant.Outlined" />
+            }
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_floor" Label="Kat" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_sqm" Label="m²" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
+            <MudNumericField @bind-Value="_arsaPay" Label="Arsa Payı (‰)" Variant="Variant.Outlined"
+                             HelperText="Arsa payı pay/payda (örn: 15.5)" />
             @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
         </MudStack>
     </DialogContent>
@@ -27,14 +60,26 @@
 
     private string _number = "";
     private string? _block;
+    private Guid? _blockId;
     private int? _floor;
     private decimal? _sqm;
+    private decimal? _arsaPay;
+    private UnitType _unitType = UnitType.Daire;
+    private List<SiteBlockDto> _blocks = [];
     private string? _error;
     private bool _busy;
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
-        if (Unit is not null) { _number = Unit.Number; _block = Unit.Block; _floor = Unit.Floor; _sqm = Unit.SquareMeters; }
+        if (!string.IsNullOrEmpty(DbFilePath))
+            _blocks = await ResidentService.GetBlocksAsync(DbFilePath);
+
+        if (Unit is not null)
+        {
+            _number = Unit.Number; _block = Unit.Block; _floor = Unit.Floor;
+            _sqm = Unit.SquareMeters; _unitType = Unit.UnitType;
+            _arsaPay = Unit.ArsaPay; _blockId = Unit.BlockId;
+        }
     }
 
     private async Task SubmitAsync()
@@ -43,7 +88,8 @@
         _busy = true; _error = null;
         try
         {
-            var cmd = new AddUnitCommand(_number, _block, _floor, _sqm);
+            var blockText = _blockId.HasValue ? null : _block;
+            var cmd = new AddUnitCommand(_number, blockText, _floor, _sqm, _unitType, _arsaPay, _blockId);
             if (Unit is null) await ResidentService.AddUnitAsync(DbFilePath, cmd);
             else await ResidentService.UpdateUnitAsync(DbFilePath, Unit.Id, cmd);
             MudDialog.Close(DialogResult.Ok(true));

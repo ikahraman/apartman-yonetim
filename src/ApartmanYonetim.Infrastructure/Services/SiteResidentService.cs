@@ -10,31 +10,40 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
     public async Task<List<UnitSummaryDto>> GetUnitsAsync(string dbFilePath)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
-        var units = await db.Units.OrderBy(u => u.Block).ThenBy(u => u.Number).ToListAsync();
+        var units = await db.Units.Include(u => u.BlockRef).OrderBy(u => u.BlockRef!.Name).ThenBy(u => u.Block).ThenBy(u => u.Floor).ThenBy(u => u.Number).ToListAsync();
         var residents = await db.Residents.Where(r => r.IsActive).ToListAsync();
         var residentByUnit = residents.ToDictionary(r => r.UnitId);
         return units.Select(u =>
         {
             residentByUnit.TryGetValue(u.Id, out var r);
             return new UnitSummaryDto(u.Id, u.Number, u.Block, u.Floor, u.SquareMeters, u.OccupancyType,
-                r?.Id, r?.FullName, r?.Phone, r?.ResidencyType, r?.Email);
+                r?.Id, r?.FullName, r?.Phone, r?.ResidencyType, r?.Email,
+                u.UnitType, u.ArsaPay, u.BlockId, u.BlockRef?.Name);
         }).ToList();
     }
 
     public async Task<UnitSummaryDto> AddUnitAsync(string dbFilePath, AddUnitCommand cmd)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
-        var unit = new SiteUnit { Number = cmd.Number, Block = cmd.Block, Floor = cmd.Floor, SquareMeters = cmd.SquareMeters };
+        var unit = new SiteUnit
+        {
+            Number = cmd.Number, Block = cmd.Block, Floor = cmd.Floor,
+            SquareMeters = cmd.SquareMeters, UnitType = cmd.UnitType,
+            ArsaPay = cmd.ArsaPay, BlockId = cmd.BlockId
+        };
         db.Units.Add(unit);
         await db.SaveChangesAsync();
-        return new UnitSummaryDto(unit.Id, unit.Number, unit.Block, unit.Floor, unit.SquareMeters, unit.OccupancyType, null, null, null, null);
+        return new UnitSummaryDto(unit.Id, unit.Number, unit.Block, unit.Floor, unit.SquareMeters, unit.OccupancyType,
+            null, null, null, null, null, unit.UnitType, unit.ArsaPay, unit.BlockId);
     }
 
     public async Task UpdateUnitAsync(string dbFilePath, Guid unitId, AddUnitCommand cmd)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var unit = await db.Units.FindAsync(unitId) ?? throw new InvalidOperationException("Daire bulunamadı.");
-        unit.Number = cmd.Number; unit.Block = cmd.Block; unit.Floor = cmd.Floor; unit.SquareMeters = cmd.SquareMeters;
+        unit.Number = cmd.Number; unit.Block = cmd.Block; unit.Floor = cmd.Floor;
+        unit.SquareMeters = cmd.SquareMeters; unit.UnitType = cmd.UnitType;
+        unit.ArsaPay = cmd.ArsaPay; unit.BlockId = cmd.BlockId;
         await db.SaveChangesAsync();
     }
 
@@ -102,5 +111,41 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
         if (r is null) return null;
         return new ResidentDto(r.Id, r.UnitId, r.FirstName, r.LastName, r.FullName,
             r.Phone, r.Email, r.ResidencyType, r.MoveInDate, r.MoveOutDate, r.IsActive, r.Notes);
+    }
+
+    public async Task<List<SiteBlockDto>> GetBlocksAsync(string dbFilePath)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        return await db.Blocks.OrderBy(b => b.Name)
+            .Select(b => new SiteBlockDto(b.Id, b.Name, b.Code, b.FloorCount, b.UnitCount))
+            .ToListAsync();
+    }
+
+    public async Task<SiteBlockDto> AddBlockAsync(string dbFilePath, SiteBlockCommand cmd)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var block = new SiteBlock { Name = cmd.Name, Code = cmd.Code, FloorCount = cmd.FloorCount, UnitCount = cmd.UnitCount };
+        db.Blocks.Add(block);
+        await db.SaveChangesAsync();
+        return new SiteBlockDto(block.Id, block.Name, block.Code, block.FloorCount, block.UnitCount);
+    }
+
+    public async Task UpdateBlockAsync(string dbFilePath, Guid blockId, SiteBlockCommand cmd)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var block = await db.Blocks.FindAsync(blockId) ?? throw new InvalidOperationException("Blok bulunamadı.");
+        block.Name = cmd.Name; block.Code = cmd.Code; block.FloorCount = cmd.FloorCount; block.UnitCount = cmd.UnitCount;
+        await db.SaveChangesAsync();
+    }
+
+    public async Task DeleteBlockAsync(string dbFilePath, Guid blockId)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var block = await db.Blocks.FindAsync(blockId) ?? throw new InvalidOperationException("Blok bulunamadı.");
+        // Unlink units before deleting
+        var units = await db.Units.Where(u => u.BlockId == blockId).ToListAsync();
+        foreach (var u in units) u.BlockId = null;
+        db.Blocks.Remove(block);
+        await db.SaveChangesAsync();
     }
 }

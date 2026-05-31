@@ -14,17 +14,17 @@ public class SiteFeeService(SiteDbContextFactory factory) : ISiteFeeService
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         return await db.FeeSchedules.OrderByDescending(s => s.IsActive).ThenBy(s => s.Name)
-            .Select(s => new FeeScheduleDto(s.Id, s.Name, s.Amount, s.Period, s.DueDay, s.StartDate, s.EndDate, s.IsActive))
+            .Select(s => new FeeScheduleDto(s.Id, s.Name, s.Amount, s.Period, s.DueDay, s.StartDate, s.EndDate, s.IsActive, s.DistributionType, s.AppliesToUnitType))
             .ToListAsync();
     }
 
     public async Task<FeeScheduleDto> AddScheduleAsync(string dbFilePath, FeeScheduleCommand cmd)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
-        var s = new SiteFeeSchedule { Name = cmd.Name, Amount = cmd.Amount, Period = cmd.Period, DueDay = cmd.DueDay, StartDate = cmd.StartDate, EndDate = cmd.EndDate };
+        var s = new SiteFeeSchedule { Name = cmd.Name, Amount = cmd.Amount, Period = cmd.Period, DueDay = cmd.DueDay, StartDate = cmd.StartDate, EndDate = cmd.EndDate, DistributionType = cmd.DistributionType, AppliesToUnitType = cmd.AppliesToUnitType };
         db.FeeSchedules.Add(s);
         await db.SaveChangesAsync();
-        return new FeeScheduleDto(s.Id, s.Name, s.Amount, s.Period, s.DueDay, s.StartDate, s.EndDate, s.IsActive);
+        return new FeeScheduleDto(s.Id, s.Name, s.Amount, s.Period, s.DueDay, s.StartDate, s.EndDate, s.IsActive, s.DistributionType, s.AppliesToUnitType);
     }
 
     public async Task UpdateScheduleAsync(string dbFilePath, Guid scheduleId, FeeScheduleCommand cmd)
@@ -33,6 +33,7 @@ public class SiteFeeService(SiteDbContextFactory factory) : ISiteFeeService
         var s = await db.FeeSchedules.FindAsync(scheduleId) ?? throw new InvalidOperationException("Aidat planı bulunamadı.");
         s.Name = cmd.Name; s.Amount = cmd.Amount; s.Period = cmd.Period;
         s.DueDay = cmd.DueDay; s.StartDate = cmd.StartDate; s.EndDate = cmd.EndDate;
+        s.DistributionType = cmd.DistributionType; s.AppliesToUnitType = cmd.AppliesToUnitType;
         await db.SaveChangesAsync();
     }
 

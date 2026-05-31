@@ -19,12 +19,13 @@
 
         <MudStack Row="true" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
             <MudChip T="string" Icon="@Icons.Material.Filled.Home" Color="Color.Default">@_units.Count Daire</MudChip>
-            <MudChip T="string" Icon="@Icons.Material.Filled.People" Color="Color.Primary">@_units.Count(u => u.OccupancyType != OccupancyType.Empty) Dolu</MudChip>
-            <MudChip T="string" Icon="@Icons.Material.Filled.HolidayVillage" Color="Color.Success">@_units.Count(u => u.OccupancyType == OccupancyType.Owner) Mal Sahibi</MudChip>
-            <MudChip T="string" Icon="@Icons.Material.Filled.Key" Color="Color.Info">@_units.Count(u => u.OccupancyType == OccupancyType.Tenant) Kiracı</MudChip>
+            <MudChip T="string" Icon="@Icons.Material.Filled.People" Color="Color.Primary">@_units.Count(u => u.ResidentId is not null) Dolu</MudChip>
+            <MudChip T="string" Icon="@Icons.Material.Filled.HolidayVillage" Color="Color.Success">@_units.Count(u => u.ResidencyType == ResidencyType.Owner) Mal Sahibi</MudChip>
+            <MudChip T="string" Icon="@Icons.Material.Filled.Key" Color="Color.Info">@_units.Count(u => u.ResidencyType == ResidencyType.Tenant || u.ResidencyType == ResidencyType.Family) Kiracı</MudChip>
             <MudSpacer />
             @if (!_readOnly)
             {
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ViewModule" OnClick="OpenBlocksDialog">Bloklar</MudButton>
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddUnitDialog">Daire Ekle</MudButton>
             }
         </MudStack>
@@ -37,19 +38,22 @@
         <MudTable T="UnitSummaryDto" Items="Filtered" Dense="true" Hover="true" Elevation="1" RowsPerPage="50">
             <HeaderContent>
                 <MudTh>Daire</MudTh>
+                <MudTh>Tür</MudTh>
                 <MudTh>Blok / Kat</MudTh>
+                <MudTh>Arsa Payı</MudTh>
                 <MudTh>Durum</MudTh>
                 <MudTh>Sakin</MudTh>
                 <MudTh>Telefon</MudTh>
-                <MudTh>Tür</MudTh>
                 <MudTh></MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd><MudText Style="font-weight:500">@context.Number</MudText></MudTd>
-                <MudTd>@(context.Block is not null ? context.Block : "")@(context.Floor is not null ? $" · {context.Floor}.kat" : "")</MudTd>
+                <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Default">@UnitTypeLabel(context.UnitType)</MudChip></MudTd>
+                <MudTd>@(context.BlockName ?? context.Block ?? "")@(context.Floor is not null ? $" · {context.Floor}.kat" : "")</MudTd>
+                <MudTd>@(context.ArsaPay.HasValue ? $"{context.ArsaPay:N2}‰" : "—")</MudTd>
                 <MudTd>
-                    <MudChip T="string" Size="Size.Small" Color="@OccupancyColor(context.OccupancyType)">
-                        @OccupancyLabel(context.OccupancyType)
+                    <MudChip T="string" Size="Size.Small" Color="@(context.ResidentId is not null ? (context.ResidencyType == ResidencyType.Owner ? Color.Success : Color.Info) : Color.Default)">
+                        @(context.ResidentId is not null ? (context.ResidencyType == ResidencyType.Owner ? "Sahip" : "Kiracı") : "Boş")
                     </MudChip>
                 </MudTd>
                 <MudTd>@(context.ResidentName ?? "—")</MudTd>
@@ -109,8 +113,8 @@
 
     private async Task OpenAddUnitDialog()
     {
-        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
-        var dialog = await DialogService.ShowAsync<UnitFormDialog>("Daire Ekle", options);
+        var p = new DialogParameters<UnitFormDialog> { { x => x.DbFilePath, _site!.DbFilePath } };
+        var dialog = await DialogService.ShowAsync<UnitFormDialog>("Daire Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         if (!(await dialog.Result)!.Canceled) await Reload();
     }
 
@@ -139,4 +143,13 @@
     private static Color OccupancyColor(OccupancyType t) => t switch { OccupancyType.Owner => Color.Success, OccupancyType.Tenant => Color.Info, _ => Color.Default };
     private static string OccupancyLabel(OccupancyType t) => t switch { OccupancyType.Owner => "Sahip", OccupancyType.Tenant => "Kiracı", _ => "Boş" };
     private static string ResidencyLabel(ResidencyType? t) => t switch { ResidencyType.Owner => "Mal Sahibi", ResidencyType.Tenant => "Kiracı", ResidencyType.Family => "Aile", _ => "" };
+    private static string UnitTypeLabel(UnitType t) => t switch { UnitType.Daire => "Daire", UnitType.Dukkan => "Dükkan", UnitType.Depo => "Depo", UnitType.Otopark => "Otopark", UnitType.Sigınak => "Sığınak", _ => "Daire" };
+
+    private async Task OpenBlocksDialog()
+    {
+        if (_site is null) return;
+        var p = new DialogParameters<SiteBlocksDialog> { { x => x.DbFilePath, _site.DbFilePath } };
+        var dialog = await DialogService.ShowAsync<SiteBlocksDialog>("Blok Yönetimi", p, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await Reload();
+    }
 }

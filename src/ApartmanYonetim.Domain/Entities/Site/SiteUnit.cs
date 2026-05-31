@@ -9,4 +9,8 @@ public class SiteUnit
     public int? Floor { get; set; }
     public decimal? SquareMeters { get; set; }
     public OccupancyType OccupancyType { get; set; } = OccupancyType.Empty;
+    public UnitType UnitType { get; set; } = UnitType.Daire;
+    public decimal? ArsaPay { get; set; }
+    public Guid? BlockId { get; set; }
+    public SiteBlock? BlockRef { get; set; }
 }

@@ -1,5 +1,6 @@
 using ApartmanYonetim.Application.Services;
 using ApartmanYonetim.Domain.Entities;
+using ApartmanYonetim.Domain.Entities.Site;
 using ApartmanYonetim.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 namespace ApartmanYonetim.Infrastructure.Services;
@@ -64,10 +65,10 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
 
     public async Task<AdminSiteDto> CreateSiteForFirmAsync(string firmSlug, SiteCommand cmd)
     {
-        await using var firmDb = firmFactory.CreateBySlug(firmSlug);
+        await using var firmDb = await firmFactory.CreateAndMigrateAsync(firmSlug);
         var company = await firmDb.Companies.FirstOrDefaultAsync()
             ?? throw new InvalidOperationException("Firma DB'sinde şirket kaydı bulunamadı.");
-        var dbPath = Path.Combine("data", "sites", $"{cmd.Slug}.db");
+        var dbPath = siteFactory.ResolvePath(Path.Combine("data", "sites", $"{cmd.Slug}.db"));
         var site = new SiteProfile
         {
             CompanyId = company.Id, Name = cmd.Name, Slug = cmd.Slug,
@@ -78,7 +79,10 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
         };
         firmDb.Sites.Add(site);
         await firmDb.SaveChangesAsync();
-        await siteFactory.CreateAndMigrateAsync(dbPath);
+        await using var siteDb = await siteFactory.CreateAndMigrateAsync(dbPath);
+        for (var i = 1; i <= cmd.UnitCount; i++)
+            siteDb.Units.Add(new SiteUnit { Number = i.ToString() });
+        await siteDb.SaveChangesAsync();
         return new AdminSiteDto(site.Id, site.CompanyId, firmSlug, company.Name, site.Name, site.Slug,
             site.City, site.UnitCount, site.DbFilePath, site.IsActive,
             site.ContractStartDate, site.ContractEndDate, site.MonthlyManagementFee, site.ContractNotes);

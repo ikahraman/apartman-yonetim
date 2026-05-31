@@ -4,6 +4,7 @@ namespace ApartmanYonetim.Infrastructure.Persistence;
 
 public class SiteDbContext(DbContextOptions<SiteDbContext> options) : DbContext(options)
 {
+    public DbSet<SiteBlock> Blocks => Set<SiteBlock>();
     public DbSet<SiteUnit> Units => Set<SiteUnit>();
     public DbSet<SiteResident> Residents => Set<SiteResident>();
     public DbSet<SiteFeeSchedule> FeeSchedules => Set<SiteFeeSchedule>();
@@ -17,6 +18,7 @@ public class SiteDbContext(DbContextOptions<SiteDbContext> options) : DbContext(
     protected override void OnModelCreating(ModelBuilder m)
     {
         base.OnModelCreating(m);
+        m.Entity<SiteUnit>(b => b.HasOne(u => u.BlockRef).WithMany(bl => bl.Units).HasForeignKey(u => u.BlockId).OnDelete(DeleteBehavior.SetNull));
         m.Entity<SiteResident>(b => b.HasIndex(r => r.UnitId));
         m.Entity<SiteFeePayment>(b =>
             b.HasIndex(p => new { p.ScheduleId, p.UnitId, p.PeriodLabel }).IsUnique());

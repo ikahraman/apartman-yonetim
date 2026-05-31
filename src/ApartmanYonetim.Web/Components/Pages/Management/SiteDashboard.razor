@@ -44,7 +44,7 @@
                             <MudText Typo="Typo.caption" Color="Color.Secondary">Doluluk Oranı</MudText>
                         </MudStack>
                         <MudText Typo="Typo.h4" Style="font-weight:700">%@_occupancyRate</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_occupiedUnits / @_totalUnits daire dolu</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@_occupiedUnits dolu / @_totalUnits toplam daire</MudText>
                         <MudProgressLinear Value="@_occupancyRate" Color="Color.Primary" Rounded="true" Size="Size.Small" Class="mt-1" />
                     </MudStack>
                 </MudPaper>
@@ -303,7 +303,7 @@
 
         var units = await ResidentService.GetUnitsAsync(db);
         _totalUnits = units.Count;
-        _occupiedUnits = units.Count(u => u.OccupancyType != OccupancyType.Empty);
+        _occupiedUnits = units.Count(u => u.ResidentId is not null);
         _occupancyRate = _totalUnits > 0 ? (int)Math.Round(_occupiedUnits * 100.0 / _totalUnits) : 0;
 
         var schedules = await FeeService.GetSchedulesAsync(db);

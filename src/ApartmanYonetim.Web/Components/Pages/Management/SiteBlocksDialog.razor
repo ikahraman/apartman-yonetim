@@ -1,0 +1,95 @@
+@inject ISiteResidentService ResidentService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Blok Ekle</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="5">
+                    <MudTextField @bind-Value="_name" Label="Blok Adı*" Variant="Variant.Outlined" Placeholder="A Blok" />
+                </MudItem>
+                <MudItem xs="3">
+                    <MudTextField @bind-Value="_code" Label="Kod" Variant="Variant.Outlined" Placeholder="A" />
+                </MudItem>
+                <MudItem xs="2">
+                    <MudNumericField @bind-Value="_floorCount" Label="Kat" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="2" Class="d-flex align-end">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddBlockAsync" Disabled="_busy" FullWidth="true">Ekle</MudButton>
+                </MudItem>
+            </MudGrid>
+
+            @if (_blocks.Count > 0)
+            {
+                <MudTable T="SiteBlockDto" Items="_blocks" Dense="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Adı</MudTh>
+                        <MudTh>Kod</MudTh>
+                        <MudTh>Kat</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@(context.Code ?? "—")</MudTd>
+                        <MudTd>@(context.FloorCount?.ToString() ?? "—")</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="() => DeleteBlockAsync(context.Id)" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Henüz blok eklenmemiş.</MudText>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close(DialogResult.Ok(_changed)))">Kapat</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+
+    private List<SiteBlockDto> _blocks = [];
+    private string _name = "";
+    private string? _code;
+    private int? _floorCount;
+    private bool _busy;
+    private bool _changed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _blocks = await ResidentService.GetBlocksAsync(DbFilePath);
+    }
+
+    private async Task AddBlockAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) return;
+        _busy = true;
+        try
+        {
+            var block = await ResidentService.AddBlockAsync(DbFilePath, new SiteBlockCommand(_name.Trim(), _code?.Trim(), _floorCount, null));
+            _blocks.Add(block);
+            _name = ""; _code = null; _floorCount = null;
+            _changed = true;
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task DeleteBlockAsync(Guid blockId)
+    {
+        try
+        {
+            await ResidentService.DeleteBlockAsync(DbFilePath, blockId);
+            _blocks.RemoveAll(b => b.Id == blockId);
+            _changed = true;
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

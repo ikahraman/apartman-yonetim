@@ -11,4 +11,6 @@ public class SiteFeeSchedule
     public DateOnly StartDate { get; set; }
     public DateOnly? EndDate { get; set; }
     public bool IsActive { get; set; } = true;
+    public DistributionType DistributionType { get; set; } = DistributionType.EsitPay;
+    public UnitType? AppliesToUnitType { get; set; }
 }

@@ -64,14 +64,7 @@ builder.Services.AddIdentityCore<AppUser>(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 
-// Derive data root from the main DB path so all SQLite files live in the same writable directory.
-var mainDbPath = connectionString.Split(';', StringSplitOptions.TrimEntries)
-    .FirstOrDefault(p => p.StartsWith("DataSource=", StringComparison.OrdinalIgnoreCase))
-    ?.Substring("DataSource=".Length) ?? "data/apartman-main.db";
-var dataRoot = Path.GetDirectoryName(Path.GetFullPath(mainDbPath)) ?? Path.GetFullPath("data");
-
-var firmDbDir = builder.Configuration["FirmDbDirectory"]
-    ?? Path.Combine(dataRoot, "FirmDatabases");
+var firmDbDir = builder.Configuration["FirmDbDirectory"] ?? "FirmDatabases";
 Directory.CreateDirectory(firmDbDir);
 builder.Services.AddSingleton(new FirmDbContextFactory(firmDbDir));
 builder.Services.AddScoped<FirmDbContext>(sp =>
@@ -94,8 +87,7 @@ builder.Services.AddScoped<FirmDbContext>(sp =>
     return factory.CreateBySlug(tenant.FirmSlug!);
 });
 
-var siteDbDir = builder.Configuration["SiteDbDirectory"]
-    ?? Path.Combine(dataRoot, "sites");
+var siteDbDir = builder.Configuration["SiteDbDirectory"] ?? "SiteDatabases";
 Directory.CreateDirectory(siteDbDir);
 builder.Services.AddSingleton(new SiteDbContextFactory(siteDbDir));
 
