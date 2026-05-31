@@ -19,7 +19,7 @@ public class SiteMaintenanceService(SiteDbContextFactory factory) : ISiteMainten
 
     public async Task<List<MaintenanceRequestDto>> GetAllAsync(string dbFilePath, MaintenanceStatus? statusFilter = null)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var query = db.MaintenanceRequests.AsQueryable();
         if (statusFilter.HasValue) query = query.Where(r => r.Status == statusFilter);
         var items = await query.OrderByDescending(r => r.Priority).ThenByDescending(r => r.ReportedAt).ToListAsync();
@@ -33,7 +33,7 @@ public class SiteMaintenanceService(SiteDbContextFactory factory) : ISiteMainten
 
     public async Task<MaintenanceRequestDto> AddAsync(string dbFilePath, MaintenanceFormCommand cmd)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var r = new SiteMaintenanceRequest
         {
             UnitId = cmd.UnitId, ReporterName = cmd.ReporterName, ReporterPhone = cmd.ReporterPhone,
@@ -46,7 +46,7 @@ public class SiteMaintenanceService(SiteDbContextFactory factory) : ISiteMainten
 
     public async Task UpdateStatusAsync(string dbFilePath, Guid id, MaintenanceStatus status, string? assignedTo, string? notes)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var r = await db.MaintenanceRequests.FindAsync(id) ?? throw new InvalidOperationException("Talep bulunamadı.");
         r.Status = status; r.AssignedTo = assignedTo ?? r.AssignedTo;
         if (notes is not null) r.ResolutionNotes = notes;
@@ -55,7 +55,7 @@ public class SiteMaintenanceService(SiteDbContextFactory factory) : ISiteMainten
 
     public async Task ResolveAsync(string dbFilePath, Guid id, string resolutionNotes)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var r = await db.MaintenanceRequests.FindAsync(id) ?? throw new InvalidOperationException("Talep bulunamadı.");
         r.Status = MaintenanceStatus.Resolved;
         r.ResolvedAt = DateTime.UtcNow;
@@ -65,7 +65,7 @@ public class SiteMaintenanceService(SiteDbContextFactory factory) : ISiteMainten
 
     public async Task<(int Open, int InProgress, int Resolved)> GetSummaryAsync(string dbFilePath)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var counts = await db.MaintenanceRequests
             .GroupBy(r => r.Status)
             .Select(g => new { Status = g.Key, Count = g.Count() })

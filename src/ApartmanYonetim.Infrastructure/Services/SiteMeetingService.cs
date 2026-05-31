@@ -12,7 +12,7 @@ public class SiteMeetingService(SiteDbContextFactory factory) : ISiteMeetingServ
 
     public async Task<List<MeetingDto>> GetAllAsync(string dbFilePath)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         return await db.Meetings.Include(m => m.Minutes)
             .OrderByDescending(m => m.MeetingDate)
             .Select(m => ToDto(m)).ToListAsync();
@@ -20,7 +20,7 @@ public class SiteMeetingService(SiteDbContextFactory factory) : ISiteMeetingServ
 
     public async Task<MeetingDto> AddAsync(string dbFilePath, MeetingCommand cmd, string createdBy)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var m = new SiteMeeting
         {
             Title = cmd.Title, Description = cmd.Description, MeetingDate = cmd.MeetingDate,
@@ -34,7 +34,7 @@ public class SiteMeetingService(SiteDbContextFactory factory) : ISiteMeetingServ
 
     public async Task UpdateAsync(string dbFilePath, Guid id, MeetingCommand cmd)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var m = await db.Meetings.FindAsync(id) ?? throw new InvalidOperationException("Toplantı bulunamadı.");
         m.Title = cmd.Title; m.Description = cmd.Description; m.MeetingDate = cmd.MeetingDate;
         m.Location = cmd.Location; m.MeetingType = cmd.MeetingType; m.AgendaItems = cmd.AgendaItems;
@@ -43,7 +43,7 @@ public class SiteMeetingService(SiteDbContextFactory factory) : ISiteMeetingServ
 
     public async Task UpdateStatusAsync(string dbFilePath, Guid id, MeetingStatus status)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var m = await db.Meetings.FindAsync(id) ?? throw new InvalidOperationException("Toplantı bulunamadı.");
         m.Status = status;
         await db.SaveChangesAsync();
@@ -51,14 +51,14 @@ public class SiteMeetingService(SiteDbContextFactory factory) : ISiteMeetingServ
 
     public async Task<MeetingMinutesDto?> GetMinutesAsync(string dbFilePath, Guid meetingId)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var mm = await db.MeetingMinutes.FirstOrDefaultAsync(m => m.MeetingId == meetingId);
         return mm is null ? null : new MeetingMinutesDto(mm.Id, mm.MeetingId, mm.Content, mm.AttendeeCount, mm.Decisions, mm.CreatedAt);
     }
 
     public async Task SaveMinutesAsync(string dbFilePath, Guid meetingId, MeetingMinutesCommand cmd)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var meeting = await db.Meetings.FindAsync(meetingId) ?? throw new InvalidOperationException("Toplantı bulunamadı.");
         var existing = await db.MeetingMinutes.FirstOrDefaultAsync(m => m.MeetingId == meetingId);
         if (existing is null)

@@ -11,7 +11,7 @@ public class SiteReportService(SiteDbContextFactory factory) : ISiteReportServic
 
     public async Task<byte[]> ExportFeeCollectionAsync(string dbFilePath, int year, int month)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var label = $"{Months[month - 1]} {year}";
         var payments = await db.FeePayments.Where(p => p.PeriodLabel == label).ToListAsync();
         var unitIds = payments.Select(p => p.UnitId).Distinct().ToList();
@@ -75,7 +75,7 @@ public class SiteReportService(SiteDbContextFactory factory) : ISiteReportServic
 
     public async Task<byte[]> ExportAccountingSummaryAsync(string dbFilePath, int year)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var entries = await db.AccountingEntries.Where(e => e.Date.Year == year).OrderBy(e => e.Date).ToListAsync();
 
         using var wb = new XLWorkbook();

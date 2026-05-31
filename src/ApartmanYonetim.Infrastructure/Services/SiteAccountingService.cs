@@ -9,7 +9,7 @@ public class SiteAccountingService(SiteDbContextFactory factory) : ISiteAccounti
 {
     public async Task<List<AccountingEntryDto>> GetAllAsync(string dbFilePath, int? year = null, int? month = null)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var query = db.AccountingEntries.AsQueryable();
         if (year.HasValue) query = query.Where(e => e.Date.Year == year);
         if (month.HasValue) query = query.Where(e => e.Date.Month == month);
@@ -23,7 +23,7 @@ public class SiteAccountingService(SiteDbContextFactory factory) : ISiteAccounti
 
     public async Task<AccountingEntryDto> AddAsync(string dbFilePath, AccountingCommand cmd, string createdBy)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var e = new SiteAccountingEntry
         {
             Type = cmd.Type, Category = cmd.Category, Amount = cmd.Amount,
@@ -36,7 +36,7 @@ public class SiteAccountingService(SiteDbContextFactory factory) : ISiteAccounti
 
     public async Task DeleteAsync(string dbFilePath, Guid id)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var e = await db.AccountingEntries.FindAsync(id) ?? throw new InvalidOperationException("Kayıt bulunamadı.");
         db.AccountingEntries.Remove(e);
         await db.SaveChangesAsync();
@@ -44,7 +44,7 @@ public class SiteAccountingService(SiteDbContextFactory factory) : ISiteAccounti
 
     public async Task<AccountingSummaryDto> GetSummaryAsync(string dbFilePath, int? year = null, int? month = null)
     {
-        await using var db = factory.Create(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
         var query = db.AccountingEntries.AsQueryable();
         if (year.HasValue) query = query.Where(e => e.Date.Year == year);
         if (month.HasValue) query = query.Where(e => e.Date.Month == month);
