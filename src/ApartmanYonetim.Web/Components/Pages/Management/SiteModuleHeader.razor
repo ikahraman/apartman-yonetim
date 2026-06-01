@@ -6,11 +6,15 @@
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="flex-wrap:wrap" Class="pt-1 px-1">
             <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Primary" />
             <MudText Typo="Typo.h6" Style="font-weight:700;white-space:nowrap">@SiteName</MudText>
+            <MudChip T="string" Size="Size.Small" Color="@SiteTypeColor(SiteType)">@SiteTypeLabel(SiteType)</MudChip>
             @if (City is not null)
             {
                 <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.LocationOn">@City</MudChip>
             }
-            <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Home">@UnitCount Daire</MudChip>
+            @if (UnitCount > 0)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Home">@UnitCount Birim</MudChip>
+            }
         </MudStack>
         <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;padding-bottom:2px">
             @foreach (var (label, icon, route, staffVisible) in _modules)
@@ -37,6 +41,7 @@
     [Parameter] public string? City { get; set; }
     [Parameter] public int UnitCount { get; set; }
     [Parameter] public string ActiveRoute { get; set; } = "";
+    [Parameter] public SiteType SiteType { get; set; } = SiteType.Site;
 
     private bool _isSiteStaff;
 
@@ -49,6 +54,20 @@
     }
 
     private void Navigate(string route) => Nav.NavigateTo($"/site/{SiteId}/{route}");
+
+    private static Color SiteTypeColor(SiteType t) => t switch
+    {
+        SiteType.Apartman  => Color.Default,
+        SiteType.TopluYapi => Color.Warning,
+        _                  => Color.Primary
+    };
+
+    private static string SiteTypeLabel(SiteType t) => t switch
+    {
+        SiteType.Apartman  => "Apartman",
+        SiteType.TopluYapi => "Toplu Yapı",
+        _                  => "Site"
+    };
 
     // staffVisible: false = SiteStaff'a gizli
     private static readonly (string Label, string Icon, string Route, bool StaffVisible)[] _modules =

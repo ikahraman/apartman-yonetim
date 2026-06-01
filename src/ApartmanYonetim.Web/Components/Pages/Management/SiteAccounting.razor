@@ -18,7 +18,7 @@
     else
     {
         <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
-                          UnitCount="@_site.UnitCount" ActiveRoute="muhasebe" />
+                          UnitCount="@_site.UnitCount" ActiveRoute="muhasebe" SiteType="@_site.SiteType" />
 
         <MudStack Row="true" Spacing="2" Class="mb-4" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
             <MudSelect @bind-Value="_year" Label="Yıl" Variant="Variant.Outlined" Dense="true" Style="max-width:100px">

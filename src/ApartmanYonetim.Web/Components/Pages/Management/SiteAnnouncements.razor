@@ -16,7 +16,7 @@
     else
     {
         <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
-                          UnitCount="@_site.UnitCount" ActiveRoute="duyurular" />
+                          UnitCount="@_site.UnitCount" ActiveRoute="duyurular" SiteType="@_site.SiteType" />
 
         <MudStack Row="true" Spacing="2" Class="mb-4" AlignItems="AlignItems.Center">
             <MudSwitch @bind-Value="_showAll" Label="Tüm duyurular" Color="Color.Primary" />

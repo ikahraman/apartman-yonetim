@@ -1,8 +1,10 @@
 @page "/sitelerim"
 @attribute [Authorize(Roles = "Manager,SiteStaff,Auditor")]
 @inject ISiteManagementService SiteService
+@inject ISiteResidentService ResidentService
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
+@inject IDialogService DialogService
 
 <PageTitle>Sitelerim</PageTitle>
 
@@ -24,10 +26,12 @@
             {
                 var s = site;
                 <MudItem xs="12" sm="6" md="4">
-                    <MudCard Elevation="2" Style="cursor:pointer" @onclick="@(() => GoToSite(s.Id))">
+                    <MudCard Elevation="2">
                         <MudCardHeader>
                             <CardHeaderAvatar>
-                                <MudAvatar Color="Color.Primary"><MudIcon Icon="@Icons.Material.Filled.Apartment" /></MudAvatar>
+                                <MudAvatar Color="@SiteTypeColor(s.SiteType)">
+                                    <MudIcon Icon="@Icons.Material.Filled.Apartment" />
+                                </MudAvatar>
                             </CardHeaderAvatar>
                             <CardHeaderContent>
                                 <MudText Typo="Typo.h6" Style="font-weight:600">@s.Name</MudText>
@@ -36,17 +40,28 @@
                         </MudCardHeader>
                         <MudCardContent>
                             <MudStack Spacing="1">
-                                @if (s.City is not null)
-                                {
-                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                        <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Color="Color.Secondary" />
-                                        <MudText Typo="Typo.body2">@s.City</MudText>
-                                    </MudStack>
-                                }
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Small" Color="Color.Secondary" />
-                                    <MudText Typo="Typo.body2">@s.UnitCount Daire</MudText>
+                                <MudStack Row="true" Spacing="1" Style="flex-wrap:wrap">
+                                    <MudChip T="string" Size="Size.Small" Color="@SiteTypeColor(s.SiteType)">
+                                        @SiteTypeLabel(s.SiteType)
+                                    </MudChip>
+                                    @if (s.City is not null)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.LocationOn">@s.City</MudChip>
+                                    }
+                                    @if (s.UnitCount > 0)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Home">@s.UnitCount Birim</MudChip>
+                                    }
                                 </MudStack>
+                                @if (s.ContractEndDate.HasValue)
+                                {
+                                    var expired = s.ContractEndDate.Value < DateOnly.FromDateTime(DateTime.Today);
+                                    var soon = !expired && s.ContractEndDate.Value < DateOnly.FromDateTime(DateTime.Today.AddDays(60));
+                                    <MudText Typo="Typo.caption" Color="@(expired ? Color.Error : soon ? Color.Warning : Color.Secondary)">
+                                        Sözleşme: @s.ContractEndDate.Value.ToString("dd.MM.yyyy")
+                                        @(expired ? " (Süresi doldu)" : soon ? " (Yakında bitiyor)" : "")
+                                    </MudText>
+                                }
                             </MudStack>
                         </MudCardContent>
                         <MudCardActions>
@@ -55,6 +70,13 @@
                                        OnClick="@(() => GoToSite(s.Id))">
                                 Yönet
                             </MudButton>
+                            @if (_isManager && s.SiteType != SiteType.Apartman)
+                            {
+                                <MudTooltip Text="Blok / Kısım yapısını düzenle">
+                                    <MudIconButton Icon="@Icons.Material.Filled.AccountTree" Size="Size.Small"
+                                                   Color="Color.Secondary" OnClick="@(() => OpenStructureDialog(s))" />
+                                </MudTooltip>
+                            }
                         </MudCardActions>
                     </MudCard>
                 </MudItem>
@@ -65,13 +87,42 @@
 
 @code {
     private List<SiteDto>? _sites;
+    private bool _isManager;
 
-    private void GoToSite(Guid id) => Nav.NavigateTo($"/site/{id}/sakinler");
+    private void GoToSite(Guid id) => Nav.NavigateTo($"/site/{id}/ozet");
 
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var user = auth.User;
+        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        _isManager = user.IsInRole("Manager") || user.IsInRole("SuperAdmin");
         _sites = await SiteService.GetForUserAsync(userId);
     }
+
+    private async Task OpenStructureDialog(SiteDto site)
+    {
+        var p = new DialogParameters<SiteBlocksDialog>
+        {
+            { x => x.DbFilePath, site.DbFilePath },
+            { x => x.SiteType, site.SiteType }
+        };
+        await DialogService.ShowAsync<SiteBlocksDialog>(
+            $"{site.Name} — Yapı Yönetimi", p,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private static Color SiteTypeColor(SiteType t) => t switch
+    {
+        SiteType.Apartman  => Color.Default,
+        SiteType.TopluYapi => Color.Warning,
+        _                  => Color.Primary
+    };
+
+    private static string SiteTypeLabel(SiteType t) => t switch
+    {
+        SiteType.Apartman  => "Apartman",
+        SiteType.TopluYapi => "Toplu Yapı",
+        _                  => "Site"
+    };
 }

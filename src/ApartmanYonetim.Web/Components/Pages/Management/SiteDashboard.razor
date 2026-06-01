@@ -19,7 +19,7 @@
     else if (_site is not null)
     {
         <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
-                          UnitCount="@_site.UnitCount" ActiveRoute="ozet" />
+                          UnitCount="@_site.UnitCount" ActiveRoute="ozet" SiteType="@_site.SiteType" />
 
         @if (_site.ContractEndDate.HasValue)
         {

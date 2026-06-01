@@ -55,9 +55,12 @@ else
                         </MudCardHeader>
                         <MudCardContent>
                             <MudStack Spacing="1">
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudIcon Icon="@Icons.Material.Filled.Home" Size="Size.Small" Color="Color.Secondary" />
-                                    <MudText Typo="Typo.body2">@s.UnitCount Daire</MudText>
+                                <MudStack Row="true" Spacing="1" Style="flex-wrap:wrap">
+                                    <MudChip T="string" Size="Size.Small" Color="@SiteTypeColor(s.SiteType)">@SiteTypeLabel(s.SiteType)</MudChip>
+                                    @if (s.UnitCount > 0)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Home">@s.UnitCount Birim</MudChip>
+                                    }
                                 </MudStack>
                                 @if (daysLeft.HasValue && daysLeft <= 90)
                                 {
@@ -113,4 +116,18 @@ else
 
         _sites = await SiteService.GetForUserAsync(userId);
     }
+
+    private static Color SiteTypeColor(SiteType t) => t switch
+    {
+        SiteType.Apartman  => Color.Default,
+        SiteType.TopluYapi => Color.Warning,
+        _                  => Color.Primary
+    };
+
+    private static string SiteTypeLabel(SiteType t) => t switch
+    {
+        SiteType.Apartman  => "Apartman",
+        SiteType.TopluYapi => "Toplu Yapı",
+        _                  => "Site"
+    };
 }
