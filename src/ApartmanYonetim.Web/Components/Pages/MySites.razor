@@ -67,8 +67,17 @@
                         <MudCardActions>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                                        StartIcon="@Icons.Material.Filled.ManageAccounts"
+                                       Disabled="@(_loadingSiteId == s.Id)"
                                        OnClick="@(() => GoToSite(s.Id))">
-                                Yönet
+                                @if (_loadingSiteId == s.Id)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                                    <span>Yükleniyor...</span>
+                                }
+                                else
+                                {
+                                    <span>Yönet</span>
+                                }
                             </MudButton>
                             @if (_isManager && s.SiteType != SiteType.Apartman)
                             {
@@ -88,8 +97,13 @@
 @code {
     private List<SiteDto>? _sites;
     private bool _isManager;
+    private Guid? _loadingSiteId;
 
-    private void GoToSite(Guid id) => Nav.NavigateTo($"/site/{id}/ozet");
+    private void GoToSite(Guid id)
+    {
+        _loadingSiteId = id;
+        Nav.NavigateTo($"/site/{id}/ozet");
+    }
 
     protected override async Task OnInitializedAsync()
     {
