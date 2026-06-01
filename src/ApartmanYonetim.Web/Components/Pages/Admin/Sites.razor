@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "SuperAdmin")]
 @inject IFirmRegistrationService FirmService
 @inject IDialogService DialogService
+@inject NavigationManager Nav
 
 <PageTitle>Siteler</PageTitle>
 
@@ -68,7 +69,7 @@
                         }
                         <MudTooltip Text="Sakinler">
                             <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Color="Color.Secondary"
-                                           Href="@($"/site/{context.Id}/sakinler")" />
+                                           OnClick="@(() => GoToSite(context.Id))" />
                         </MudTooltip>
                     </MudStack>
                 </MudTd>
@@ -80,6 +81,9 @@
 @code {
     private List<AdminSiteDto> _sites = [];
     private bool _loading = true;
+    private Guid? _navigatingId;
+
+    private void GoToSite(Guid id) { _navigatingId = id; Nav.NavigateTo($"/site/{id}/sakinler"); }
 
     protected override async Task OnInitializedAsync()
     {

@@ -11,6 +11,13 @@
 
 <PageTitle>Özet</PageTitle>
 
+<MudOverlay Visible="_navigating" DarkBackground="true" ZIndex="9999" AutoClose="false">
+    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <MudText Typo="Typo.body1" Style="color:white">Sayfa yükleniyor...</MudText>
+    </MudStack>
+</MudOverlay>
+
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
     @if (_loading)
     {
@@ -37,7 +44,7 @@
 
         <MudGrid Spacing="3" Class="mb-5">
             <MudItem xs="12" sm="6" md="3">
-                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/sakinler"))'>
+                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Navigate("sakinler"))'>
                     <MudStack Spacing="1">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.Home" Color="Color.Primary" Size="Size.Small" />
@@ -51,7 +58,7 @@
             </MudItem>
 
             <MudItem xs="12" sm="6" md="3">
-                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/aidatlar"))'>
+                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Navigate("aidatlar"))'>
                     <MudStack Spacing="1">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Success" Size="Size.Small" />
@@ -65,7 +72,7 @@
             </MudItem>
 
             <MudItem xs="12" sm="6" md="3">
-                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/arizalar"))'>
+                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Navigate("arizalar"))'>
                     <MudStack Spacing="1">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.Build" Color="@(_openMaintenance + _inProgressMaintenance > 0 ? Color.Warning : Color.Success)" Size="Size.Small" />
@@ -79,7 +86,7 @@
             </MudItem>
 
             <MudItem xs="12" sm="6" md="3">
-                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/muhasebe"))'>
+                <MudPaper Elevation="2" Class="pa-4" Style="cursor:pointer" @onclick='@(() => Navigate("muhasebe"))'>
                     <MudStack Spacing="1">
                         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.AccountBalanceWallet"
@@ -145,7 +152,7 @@
                         <MudText Typo="Typo.subtitle1" Style="font-weight:600">Son Duyurular</MudText>
                         <MudSpacer />
                         <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
-                                   OnClick='@(() => Nav.NavigateTo($"/site/{SiteId}/duyurular"))'>Tümü</MudButton>
+                                   OnClick='@(() => Navigate("duyurular"))'>Tümü</MudButton>
                     </MudStack>
                     @if (_recentAnnouncements.Count == 0)
                     {
@@ -181,7 +188,7 @@
                         <MudText Typo="Typo.subtitle1" Style="font-weight:600">Yaklaşan Toplantılar</MudText>
                         <MudSpacer />
                         <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
-                                   OnClick='@(() => Nav.NavigateTo($"/site/{SiteId}/toplanti"))'>Tümü</MudButton>
+                                   OnClick='@(() => Navigate("toplanti"))'>Tümü</MudButton>
                     </MudStack>
                     @if (_upcomingMeetings.Count == 0)
                     {
@@ -222,7 +229,7 @@
                     </MudStack>
                     <MudStack Spacing="2">
                         <MudPaper Outlined="true" Class="px-3 py-2" Style="cursor:pointer"
-                                  @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/arizalar"))'>
+                                  @onclick='@(() => Navigate("arizalar"))'>
                             <MudStack Row="true" AlignItems="AlignItems.Center">
                                 <MudIcon Icon="@Icons.Material.Filled.FiberNew" Size="Size.Small" Color="Color.Error" Class="mr-2" />
                                 <MudText Typo="Typo.body2" Style="flex:1">Açık</MudText>
@@ -230,7 +237,7 @@
                             </MudStack>
                         </MudPaper>
                         <MudPaper Outlined="true" Class="px-3 py-2" Style="cursor:pointer"
-                                  @onclick='@(() => Nav.NavigateTo($"/site/{SiteId}/arizalar"))'>
+                                  @onclick='@(() => Navigate("arizalar"))'>
                             <MudStack Row="true" AlignItems="AlignItems.Center">
                                 <MudIcon Icon="@Icons.Material.Filled.Loop" Size="Size.Small" Color="Color.Warning" Class="mr-2" />
                                 <MudText Typo="Typo.body2" Style="flex:1">Devam Ediyor</MudText>
@@ -275,6 +282,7 @@
 
     private SiteDto? _site;
     private bool _loading = true;
+    private bool _navigating;
 
     private int _totalUnits, _occupiedUnits, _occupancyRate;
     private decimal _expectedAmount, _collectedAmount;
@@ -383,5 +391,11 @@
             new ChartSeries<double> { Name = "Gelir", Data = incomes },
             new ChartSeries<double> { Name = "Gider", Data = expenses }
         ];
+    }
+
+    private void Navigate(string route)
+    {
+        _navigating = true;
+        Nav.NavigateTo($"/site/{SiteId}/{route}");
     }
 }

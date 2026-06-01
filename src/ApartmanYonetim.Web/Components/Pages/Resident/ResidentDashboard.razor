@@ -10,6 +10,13 @@
 
 <PageTitle>Sakin Portali</PageTitle>
 
+<MudOverlay Visible="_navigating" DarkBackground="true" ZIndex="9999" AutoClose="false">
+    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <MudText Typo="Typo.body1" Style="color:white">Sayfa yükleniyor...</MudText>
+    </MudStack>
+</MudOverlay>
+
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
     @if (_loading)
     {
@@ -31,7 +38,7 @@
 
         <MudGrid Spacing="3">
             <MudItem xs="12" sm="6" md="3">
-                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo("/sakin/duyurular"))'>
+                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Navigate("/sakin/duyurular"))'>
                     <MudCardContent>
                         <MudStack AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.Campaign" Color="Color.Primary" Style="font-size:2.5rem" />
@@ -45,7 +52,7 @@
                 </MudCard>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo("/sakin/aidatlar"))'>
+                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Navigate("/sakin/aidatlar"))'>
                     <MudCardContent>
                         <MudStack AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.Receipt" Color="Color.Warning" Style="font-size:2.5rem" />
@@ -59,7 +66,7 @@
                 </MudCard>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo("/sakin/talepler"))'>
+                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Navigate("/sakin/talepler"))'>
                     <MudCardContent>
                         <MudStack AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.Build" Color="Color.Secondary" Style="font-size:2.5rem" />
@@ -69,7 +76,7 @@
                 </MudCard>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo("/sakin/toplanti"))'>
+                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Navigate("/sakin/toplanti"))'>
                     <MudCardContent>
                         <MudStack AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.Groups" Color="Color.Info" Style="font-size:2.5rem" />
@@ -83,7 +90,7 @@
                 </MudCard>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Nav.NavigateTo("/sakin/profil"))'>
+                <MudCard Elevation="2" Style="cursor:pointer" @onclick='@(() => Navigate("/sakin/profil"))'>
                     <MudCardContent>
                         <MudStack AlignItems="AlignItems.Center" Spacing="1">
                             <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Success" Style="font-size:2.5rem" />
@@ -168,6 +175,7 @@
 
 @code {
     private bool _loading = true;
+    private bool _navigating;
     private SiteDto? _site;
     private ResidentDto? _resident;
     private string? _unitNumber;
@@ -212,6 +220,8 @@
         }
         _loading = false;
     }
+
+    private void Navigate(string url) { _navigating = true; Nav.NavigateTo(url); }
 
     private static Color PaymentColor(FeePaymentStatus s) => s switch { FeePaymentStatus.Paid => Color.Success, FeePaymentStatus.Overdue => Color.Error, _ => Color.Warning };
     private static string PaymentLabel(FeePaymentStatus s) => s switch { FeePaymentStatus.Paid => "Ödendi", FeePaymentStatus.Overdue => "Gecikmiş", _ => "Bekliyor" };
