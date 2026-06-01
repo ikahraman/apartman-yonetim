@@ -1,0 +1,370 @@
+@page "/bilgi/sablonlar"
+@layout PublicLayout
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<PageTitle>Hazır Şablonlar — ApartNet</PageTitle>
+
+<div style="background:linear-gradient(90deg,#E65100,#EF6C00);color:white;padding:20px 16px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Style="font-size:2rem" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h5" Style="font-weight:800">Hazır Şablonlar</MudText>
+                <MudText Typo="Typo.body2" Style="opacity:0.85">Kopyalayın, doldurun, kullanın — ücretsiz</MudText>
+            </MudStack>
+        </MudStack>
+    </MudContainer>
+</div>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-5">
+
+    @* Kategori Filtresi *@
+    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mb-4">
+        <MudChip T="string" Color="@(_secili == null ? Color.Primary : Color.Default)"
+                  OnClick="@(() => _secili = null)" Style="cursor:pointer">Tümü</MudChip>
+        @foreach (var kat in _kategoriler)
+        {
+            <MudChip T="string" Color="@(_secili == kat ? Color.Primary : Color.Default)"
+                      OnClick="@(() => _secili = kat)" Style="cursor:pointer">@kat</MudChip>
+        }
+    </MudStack>
+
+    <MudGrid Spacing="3">
+        @foreach (var sablon in FilteredSablonlar)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="2" Style="height:100%">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="@sablon.Renk">
+                                <MudIcon Icon="@sablon.Icon" />
+                            </MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.subtitle1" Style="font-weight:700">@sablon.Baslik</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Style="height:20px">@sablon.Kategori</MudChip>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@sablon.Aciklama</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.ContentCopy"
+                                   OnClick="@(() => KopyalaAsync(sablon))">
+                            Kopyala
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                   OnClick="@(() => _gorunutlenen = _gorunutlenen == sablon ? null : sablon)">
+                            @(_gorunutlenen == sablon ? "Gizle" : "Önizle")
+                        </MudButton>
+                    </MudCardActions>
+                    @if (_gorunutlened == sablon)
+                    {
+                        <MudCardContent>
+                            <MudPaper Outlined="true" Class="pa-3" Style="background:#FAFAFA;max-height:300px;overflow-y:auto">
+                                <pre style="white-space:pre-wrap;font-size:12px;font-family:monospace">@sablon.Icerik</pre>
+                            </MudPaper>
+                        </MudCardContent>
+                    }
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+</MudContainer>
+
+@code {
+    private string? _secili;
+    private Sablon? _gorunutlened;
+    private Sablon? _gorunutlenen
+    {
+        get => _gorunutlened;
+        set { _gorunutlened = value; StateHasChanged(); }
+    }
+
+    private string[] _kategoriler = ["Toplantı", "Aidat", "Bildirim", "Sözleşme", "Dilekçe"];
+
+    private IEnumerable<Sablon> FilteredSablonlar =>
+        _secili is null ? _sablonlar : _sablonlar.Where(s => s.Kategori == _secili);
+
+    private async Task KopyalaAsync(Sablon s)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", s.Icerik);
+        Snackbar.Add($"'{s.Baslik}' kopyalandı!", Severity.Success);
+    }
+
+    private record Sablon(string Baslik, string Kategori, string Icon, Color Renk, string Aciklama, string Icerik);
+
+    private static readonly Sablon[] _sablonlar =
+    [
+        new("Olağan Genel Kurul Toplantı Tutanağı", "Toplantı", Icons.Material.Filled.Groups, Color.Primary,
+            "Yıllık olağan kat malikleri kurulu toplantısı için standart tutanak şablonu.",
+            """
+KAT MALİKLERİ KURULU TOPLANTI TUTANAĞI
+
+Bina/Site Adı  : ______________________________
+Adresi         : ______________________________
+Toplantı Tarihi: __/__/20__
+Toplantı Saati : __:__
+Toplantı Yeri  : ______________________________
+
+Toplantı Türü  : Olağan Yıllık Toplantı
+
+KATILIMCILAR:
+Toplam Bağımsız Bölüm Sayısı : ___
+Toplantıya Katılan Malik Sayısı: ___
+Temsil Edilen Arsa Payı Toplamı: ___/___
+
+GÜNDEM MADDELERİ:
+
+1. Açılış ve divan kurulunun oluşturulması
+   Divan Başkanı: ______________________________
+   Katip: ______________________________
+   Oy Toplayıcı: ______________________________
+
+2. Bir önceki toplantı tutanağının okunması ve onaylanması
+   Karar: Onaylandı / Onaylanmadı
+
+3. Yöneticinin sunduğu faaliyet raporunun görüşülmesi
+   Özet: ______________________________
+   Karar: Oybirliği ile onaylandı / Reddedildi
+
+4. Gelir-gider hesaplarının incelenmesi ve yöneticinin ibrası
+   Karar: Yönetici ibra edildi / Edilmedi
+
+5. ___/___/20__ - ___/___/20__ dönemi bütçesinin belirlenmesi
+   Tahmini Bütçe: ___________ TL
+   Karar: ___________________________
+
+6. Aylık aidat miktarının belirlenmesi
+   Yeni Aidat Miktarı: ___________ TL
+   Yürürlük Tarihi: __/__/20__
+   Karar: Oybirliği ile kabul edildi / Oyçokluğuyla kabul edildi
+
+7. Yönetici seçimi (gerekirse)
+   Seçilen Yönetici: ______________________________
+   Görev Süresi: ___ yıl
+   Ücret: ___________ TL/ay
+
+8. Dilek ve temenniler
+
+SONUÇ:
+Gündemdeki tüm maddeler görüşülerek karara bağlanmış, tutanak imzalanmıştır.
+
+Divan Başkanı           Katip                 Oy Toplayıcı
+_______________     _______________      _______________
+"""),
+
+        new("Aidat İhbarnamesi / Ödeme Bildirimi", "Aidat", Icons.Material.Filled.AccountBalance, Color.Warning,
+            "Kat maliklerine gönderilecek aylık aidat ödeme bildirimi.",
+            """
+AİDAT ÖDEME BİLDİRİMİ
+
+Tarih: __/__/20__
+
+Sayın [AD SOYAD],
+[BAĞIMSIZ BÖLÜM NO] nolu daire sahibi/sakini
+
+Binamız/sitemiz yönetimi tarafından belirlenen __/__/20__ - __/__/20__ dönemi
+aidat ve avans ödemelerine ilişkin bilgileriniz aşağıda sunulmuştur.
+
+─────────────────────────────────────────
+DÖNEM           : ___/20__
+AİDAT MİKTARI  : ___________ TL
+SON ÖDEME TARİHİ: __/__/20__
+ÖDEME HESABI    : IBAN: TR__ ____ ____ ____ ____ ____ __
+                  Banka: ______________________________
+                  Hesap Sahibi: ______________________________
+─────────────────────────────────────────
+
+GECIKME DURUMU (varsa):
+Önceki dönem borcu : ___________ TL
+Gecikme tazminatı  : ___________ TL
+TOPLAM BORÇ        : ___________ TL
+
+ÖNEMLİ: Son ödeme tarihinden itibaren gecikme tazminatı uygulanacaktır.
+Ödeme yaparken daire numaranızı açıklama kısmına yazmanızı rica ederiz.
+
+Bilgilerinize saygıyla sunarız.
+
+[BİNA/SİTE ADI] Yönetimi
+Yönetici: ______________________________
+İletişim: ______________________________
+"""),
+
+        new("Aidat Borcu Uyarı / İhtar Mektubu", "Aidat", Icons.Material.Filled.Warning, Color.Error,
+            "Aidat borcu bulunan kat malikine gönderilecek resmi uyarı mektubu.",
+            """
+İHTAR MEKTUBu
+
+Tarih: __/__/20__
+
+ALICI:
+Ad Soyad: ______________________________
+Adres: ______________________________
+
+Konu: Aidat Borcunun Ödenmesi Talebi
+
+Sayın [AD SOYAD],
+
+[BİNA/SİTE ADI] apartmanındaki [DAİRE NO] nolu bağımsız bölüm maliki/sakini sıfatıyla
+aşağıda belirtilen aidat borçlarınızın bulunduğu tespit edilmiştir:
+
+Dönem          Tutar      Durum
+________       ___ TL     Ödenmedi
+________       ___ TL     Ödenmedi
+─────────────────────────
+TOPLAM         ___ TL
+
+İşbu ihtarnamenin tarafınıza tebliğ tarihinden itibaren 7 (yedi) gün içinde
+yukarıda belirtilen borç toplamının yönetim hesabına yatırılması gerekmektedir.
+
+Aksi hâlde 634 Sayılı Kat Mülkiyeti Kanunu'nun 20. maddesi uyarınca
+gecikme tazminatı uygulanacak ve yasal icra takibi başlatılacaktır.
+
+Gereğini saygıyla bildiririm.
+
+[BİNA/SİTE ADI] Yönetimi
+Yönetici: ______________________________
+İmza/Kaşe:
+"""),
+
+        new("Yönetici Seçim Tutanağı", "Toplantı", Icons.Material.Filled.HowToVote, Color.Success,
+            "Kat malikleri kurulunda yönetici seçimi için kullanılacak tutanak.",
+            """
+YÖNETİCİ SEÇİM TUTANAĞI
+
+Bina/Site Adı: ______________________________
+Adres: ______________________________
+Toplantı Tarihi: __/__/20__
+
+Kat malikleri kurulu, aşağıda kimlik bilgileri belirtilen kişiyi/kuruluşu yönetici
+olarak seçmiştir.
+
+SEÇİLEN YÖNETİCİ:
+Ad Soyad / Kuruluş Adı: ______________________________
+TC Kimlik No / Vergi No: ______________________________
+Adres: ______________________________
+Telefon: ______________________________
+E-posta: ______________________________
+
+GÖREV SÜRESİ: __/__/20__ - __/__/20__
+AYLIK YÖNETİCİ ÜCRETİ: ___________ TL (ücretsiz ise "ücret alınmayacaktır")
+
+OY DAĞILIMI:
+Kabul: ___  Red: ___  Çekimser: ___
+Toplam Temsil Edilen Arsa Payı: ___/___
+
+İşbu tutanak kat malikleri kurulunca onaylanmıştır.
+
+Yönetici Adayı İmzası           Toplantı Başkanı İmzası
+___________________             ___________________
+"""),
+
+        new("Ortak Alan Kullanım Yasağı Bildirimi", "Bildirim", Icons.Material.Filled.Block, Color.Error,
+            "Aidat borçlusu maliklere ortak alan kısıtlaması bildirimi.",
+            """
+ORTAK ALAN KULLANIM KISITLAMASI BİLDİRİMİ
+
+Tarih: __/__/20__
+
+Sayın [AD SOYAD],
+
+Yönetim kurulumuzun __/__/20__ tarihli kararı uyarınca, [DAİRE NO] nolu
+bağımsız bölüme ait ___________ TL tutarındaki aidat borcunun ödenmemiş
+olması nedeniyle aşağıdaki ortak alanların kullanımı geçici olarak kısıtlanmıştır:
+
+□ Otopark
+□ Havuz / Spor Salonu
+□ Sosyal Tesis
+
+Borcunuzun tarafımıza ulaşmasını müteakip kısıtlama kaldırılacaktır.
+
+Saygılarımızla,
+[BİNA/SİTE ADI] Yönetimi
+"""),
+
+        new("Vekaletname (Toplantı İçin)", "Dilekçe", Icons.Material.Filled.AssignmentInd, Color.Secondary,
+            "Kat malikleri kurulu toplantısına vekil göndermek için kullanılacak vekaletname.",
+            """
+VEKALETNAME
+
+Ben aşağıda imzası bulunan ________________________________,
+TC Kimlik No: ____________________,
+[BİNA/SİTE ADI] adresindeki [DAİRE NO] nolu bağımsız bölüm maliki sıfatıyla;
+
+__/__/20__ tarihinde yapılacak kat malikleri kurulu toplantısında beni temsil etmek,
+gündemdeki tüm maddeleri oylamak ve karar almak üzere
+
+Ad Soyad: ______________________________
+TC Kimlik No: ______________________________
+
+kişisini VEKİLİM olarak tayin ettim.
+
+Tarih: __/__/20__
+İsim: ______________________________
+İmza: ______________________________
+
+(Bu vekaletname noter onaylı olmaksızın da geçerlidir.
+Toplantıya katılım için yöneticiye teslim ediniz.)
+"""),
+
+        new("Bina Bakım & Arıza Bildirim Formu", "Bildirim", Icons.Material.Filled.Build, Color.Primary,
+            "Sakinlerin ortak alan arızalarını yöneticiye bildirmesi için standart form.",
+            """
+BİNA ARIZA / BAKIM BİLDİRİM FORMU
+
+Tarih: __/__/20__
+Bildiren: ______________________________
+Daire No: ______________________________
+Telefon: ______________________________
+
+ARIZA / BAKIM KONUSU:
+□ Asansör    □ Elektrik    □ Su/Tesisat    □ Isıtma
+□ Çatı       □ Dış Cephe   □ Ortak Alan    □ Diğer: __________
+
+Ayrıntılı Açıklama:
+______________________________________________________
+______________________________________________________
+______________________________________________________
+
+Arızanın Yeri: ______________________________
+Aciliyet Durumu: □ Acil (can/mal güvenliği)   □ Normal
+
+Yönetici Onayı:
+Tarih: __/__/20__
+İşlem: ______________________________
+Sorumlu Kişi/Firma: ______________________________
+Tamamlanma Tarihi: __/__/20__
+"""),
+
+        new("Yönetim Planı Değişikliği Teklif Dilekçesi", "Dilekçe", Icons.Material.Filled.Edit, Color.Warning,
+            "Yönetim planında değişiklik talep eden malikler için dilekçe şablonu.",
+            """
+YÖNETİM PLANI DEĞİŞİKLİĞİ TALEBİ
+
+Tarih: __/__/20__
+
+[BİNA/SİTE ADI] Yönetimine,
+
+Aşağıda imzası bulunan kat malikleri olarak, 634 Sayılı Kat Mülkiyeti Kanunu'nun
+28. maddesi uyarınca yönetim planımızın aşağıdaki maddesinin değiştirilmesini
+talep etmekteyiz:
+
+DEĞİŞTİRİLMEK İSTENEN MADDE:
+Mevcut: _________________________________________________
+Önerilen: _________________________________________________
+Gerekçe: _________________________________________________
+
+Bu talep doğrultusunda kat malikleri kurulunun olağanüstü toplantıya çağrılmasını
+saygıyla arz ederiz.
+
+İmzalar:
+1. Ad Soyad: _________________ Daire No: _____ İmza: _______
+2. Ad Soyad: _________________ Daire No: _____ İmza: _______
+3. Ad Soyad: _________________ Daire No: _____ İmza: _______
+"""),
+    ];
+}

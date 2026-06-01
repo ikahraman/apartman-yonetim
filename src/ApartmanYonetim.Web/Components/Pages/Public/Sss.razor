@@ -1,0 +1,184 @@
+@page "/bilgi/sss"
+@layout PublicLayout
+
+<PageTitle>Sık Sorulan Sorular — ApartNet</PageTitle>
+
+<div style="background:linear-gradient(90deg,#4527A0,#512DA8);color:white;padding:20px 16px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.QuestionAnswer" Style="font-size:2rem" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h5" Style="font-weight:800">Sık Sorulan Sorular</MudText>
+                <MudText Typo="Typo.body2" Style="opacity:0.85">Apartman ve site yönetimiyle ilgili en çok merak edilenler</MudText>
+            </MudStack>
+        </MudStack>
+    </MudContainer>
+</div>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-5">
+    <MudGrid Spacing="4">
+
+        @* Kategori Filtreleri *@
+        <MudItem xs="12">
+            <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                <MudChip T="string" Color="@(_seciliKategori == null ? Color.Primary : Color.Default)"
+                          OnClick="@(() => _seciliKategori = null)" Style="cursor:pointer">Tümü</MudChip>
+                @foreach (var kat in _kategoriler)
+                {
+                    <MudChip T="string" Color="@(_seciliKategori == kat ? Color.Primary : Color.Default)"
+                              OnClick="@(() => _seciliKategori = kat)" Style="cursor:pointer">@kat</MudChip>
+                }
+            </MudStack>
+        </MudItem>
+
+        @* SSS Listesi *@
+        <MudItem xs="12" md="8">
+            @foreach (var grup in FilteredGroups)
+            {
+                <MudText Typo="Typo.subtitle1" Style="font-weight:700" Class="mb-2 mt-3">
+                    <MudIcon Icon="@grup.Icon" Color="Color.Primary" Size="Size.Small" Class="mr-1" />
+                    @grup.Kategori
+                </MudText>
+                <MudExpansionPanels Elevation="1" Class="mb-3">
+                    @foreach (var soru in grup.Sorular)
+                    {
+                        <MudExpansionPanel>
+                            <TitleContent>
+                                <MudText Typo="Typo.body1" Style="font-weight:600">@soru.Soru</MudText>
+                            </TitleContent>
+                            <ChildContent>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Style="white-space:pre-line">@soru.Cevap</MudText>
+                                @if (soru.KmkMadde is not null)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mt-2">
+                                        KMK @soru.KmkMadde
+                                    </MudChip>
+                                }
+                            </ChildContent>
+                        </MudExpansionPanel>
+                    }
+                </MudExpansionPanels>
+            }
+        </MudItem>
+
+        @* Sağ Kenar *@
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4 mb-3">
+                <MudText Typo="Typo.subtitle1" Style="font-weight:700" Class="mb-2">Cevap Bulamadınız mı?</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Destek talebi oluşturun, uzmanlarımız en kısa sürede yanıt versin.
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           Href="/destek" StartIcon="@Icons.Material.Filled.SupportAgent">
+                    Destek Talebi Oluştur
+                </MudButton>
+            </MudPaper>
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.subtitle1" Style="font-weight:700" Class="mb-2">Faydalı Bağlantılar</MudText>
+                <MudStack Spacing="1">
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true"
+                               Style="justify-content:flex-start" Href="/bilgi/hukuki-cerceve"
+                               StartIcon="@Icons.Material.Filled.Gavel">KMK Rehberi</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true"
+                               Style="justify-content:flex-start" Href="/bilgi/sablonlar"
+                               StartIcon="@Icons.Material.Filled.Description">Hazır Şablonlar</MudButton>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" FullWidth="true"
+                               Style="justify-content:flex-start" Href="/bilgi/servis-rehberi"
+                               StartIcon="@Icons.Material.Filled.Handyman">Servis Rehberi</MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private string? _seciliKategori;
+
+    private record SssItem(string Soru, string Cevap, string? KmkMadde = null);
+    private record SssGrup(string Kategori, string Icon, SssItem[] Sorular);
+
+    private IEnumerable<SssGrup> FilteredGroups =>
+        _seciliKategori == null ? _gruplar : _gruplar.Where(g => g.Kategori == _seciliKategori);
+
+    private string[] _kategoriler = ["Aidat", "Yönetici", "Toplantı", "Tadilat", "Kiracı", "Hukuki Süreç"];
+
+    private static readonly SssGrup[] _gruplar =
+    [
+        new("Aidat", Icons.Material.Filled.AccountBalance,
+        [
+            new("Aidat ödemezsem ne olur?",
+                "Aidat borcunu ödemeyen kat maliki hakkında gecikme tazminatı işler. Yönetici icra takibi başlatabilir. Mahkeme kararıyla ortak alan kullanımı (otopark, havuz, asansör) kısıtlanabilir. Borç mülkle birlikte devredilir; satın alan kişi de sorumlu tutulabilir.",
+                "Md. 20"),
+            new("Aidat miktarını kim belirler?",
+                "Kat malikleri kurulu, yıllık olağan toplantısında bir sonraki dönem aidat miktarını belirler. Karar, arsa payının yarısından fazlasını temsil eden maliklerin çoğunluğuyla alınır.",
+                "Md. 28"),
+            new("Kiracı aidat ödemek zorunda mı?",
+                "Kural olarak aidat ödeme yükümlülüğü kat malikine aittir. Ancak ısıtma, asansör, su gibi doğrudan kullanıma bağlı giderler kira sözleşmesinde kiracıya yüklenebilir. Yönetici asıl borç için malik aleyhine takip başlatabilir."),
+            new("Aidatı kaç gün gecikmeli ödeyebilirim?",
+                "Kanunda belirli bir tolerans süresi öngörülmemiştir. Yönetim planında gecikme tazminatı başlangıç tarihi belirtilebilir. Genellikle son ödeme gününden itibaren yasal faiz işlemeye başlar.",
+                "Md. 20"),
+        ]),
+
+        new("Yönetici", Icons.Material.Filled.ManageAccounts,
+        [
+            new("Yönetici nasıl seçilir?",
+                "Kat malikleri kurulu, kendi aralarından veya dışarıdan bir gerçek ya da tüzel kişiyi yönetici olarak seçebilir. Seçim, arsa payının yarısından fazlasının oyu ile yapılır. Yönetici, yönetim planında aksi belirtilmemişse 1 yıl görev yapar.",
+                "Md. 34"),
+            new("Yönetici görevden alınabilir mi?",
+                "Evet. Kat malikleri kurulu, olağanüstü toplantıyla yöneticiyi görevden alabilir. Bunun için toplantıya katılan maliklerin salt çoğunluğunun oyu yeterlidir. Yönetici hakaret, zimmet gibi ağır bir suç işlemişse mahkeme aracılığıyla da görevden alınabilir.",
+                "Md. 36"),
+            new("Yönetici hesap vermek zorunda mı?",
+                "Evet. Yönetici, yıl sonunda tüm gelir-gider hesaplarını kat maliklerine sunmak zorundadır. Maliklerin 1/5'inin isteği üzerine her zaman hesap vermekle yükümlüdür. Hesapları onaylamayan malikler itiraz hakkını saklı tutar.",
+                "Md. 38"),
+            new("Yönetim firması ile yönetici aynı şey mi?",
+                "Hayır. Yönetici, KMK kapsamında yasal sorumluluğu taşıyan kişi veya kuruluştur. Yönetim firması, kat malikleri kurulunun yönetici olarak atadığı bir tüzel kişilik olabilir. Firma, kanuni yükümlülükleri yönetici sıfatıyla üstlenir."),
+        ]),
+
+        new("Toplantı", Icons.Material.Filled.Groups,
+        [
+            new("Olağan toplantı ne zaman yapılır?",
+                "Her yıl, yönetim planında belirtilen tarihte yapılır. Planda tarih yoksa Ocak ayının ilk haftasında toplanılır. Toplantıda yönetici seçimi, hesap ibrazı ve yıllık bütçe görüşülür.",
+                "Md. 29"),
+            new("Toplantı yeter sayısı nedir?",
+                "İlk toplantıda arsa payının yarısından fazlasını temsil eden kat maliklerinin katılımı gerekir. Bu sağlanamazsa en az 7 gün sonraya yeni toplantı çağrısı yapılır; ikinci toplantıda yeter sayı aranmaz.",
+                "Md. 29"),
+            new("Toplantıya vekaletname ile katılabilir miyim?",
+                "Evet. Kat maliki, yazılı vekaletname ile başka bir maliki ya da üçüncü bir kişiyi toplantıya gönderebilir. Vekil, asil adına oy kullanır.",
+                "Md. 31"),
+            new("Alınan karara itiraz edebilir miyim?",
+                "Evet. Toplantıya katılmayan ya da karara karşı oy kullanan malikler, kararın tebliğinden itibaren 1 ay içinde sulh hukuk mahkemesine itiraz edebilir.",
+                "Md. 33"),
+        ]),
+
+        new("Tadilat", Icons.Material.Filled.Build,
+        [
+            new("Dairemde tadilat yapabilir miyim?",
+                "Kendi bağımsız bölümünüzde, taşıyıcı sisteme ve ortak alanlara zarar vermeyecek tadilat yapabilirsiniz. Komşuları rahatsız edecek gürültülü çalışmalar için yönetim planındaki saatlere uyulmalıdır."),
+            new("Balkonumu kapatabilir miyim?",
+                "Balkon genellikle ortak yer sayılır. Cepheyi değiştiren her türlü tadilat (cam balkon dahil) tüm kat maliklerinin onayını gerektirir. İzinsiz tadilat eski hale getirme davası ile sonuçlanabilir.",
+                "Md. 19"),
+            new("Çatı katı veya bodrum dönüşümü yapılabilir mi?",
+                "Bu alanlar ortak mülkiyet kapsamında olduğundan dönüşüm için tüm kat maliklerinin oy birliği ve çoğu durumda belediye onayı gerekir.",
+                "Md. 45"),
+        ]),
+
+        new("Kiracı", Icons.Material.Filled.Key,
+        [
+            new("Kiracının apartman yönetimindeki hakları nelerdir?",
+                "Kiracı, ortak alanları (asansör, otopark, bahçe vb.) kullanma hakkına sahiptir. Toplantılara katılamaz ve oy kullanamaz; ancak toplantıda görüş bildirebilir. Yönetim kararlarına doğrudan itiraz hakkı yoktur."),
+            new("Kiracı çıkarıldığında aidat borcu kime kalır?",
+                "Kiracı çıktığında, kira sözleşmesiyle üstlendiği giderlerden doğan borç kiracıya ait kalır. Ancak kat malikiyle ilgili borçlar malike ait olmaya devam eder."),
+        ]),
+
+        new("Hukuki Süreç", Icons.Material.Filled.Gavel,
+        [
+            new("Komşum sürekli gürültü yapıyor, ne yapabilirim?",
+                "Önce yöneticiye yazılı başvurun. Yönetici ihtar gönderebilir. Sorun çözülmezse sulh hukuk mahkemesine başvurabilir ya da savcılığa gürültü şikayetinde bulunabilirsiniz."),
+            new("Yöneticinin kötü yönetimi için ne yapabilirim?",
+                "Kat malikleri kurulunu olağanüstü toplantıya çağırabilirsiniz (maliklerin 1/3'ünün imzası yeterlidir). Toplantıda yönetici değiştirilebilir. Maddi zarar varsa tazminat davası açılabilir.",
+                "Md. 36"),
+            new("Apartmandaki sorunlar için hangi mahkemeye gidilir?",
+                "KMK'dan doğan uyuşmazlıklar için görevli mahkeme Sulh Hukuk Mahkemesi'dir. Dava, anlaşmazlık konusuna göre taşınmazın bulunduğu yerde açılır."),
+        ]),
+    ];
+}

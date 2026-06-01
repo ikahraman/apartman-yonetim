@@ -1,0 +1,159 @@
+@page "/bilgi/servis-rehberi"
+@layout PublicLayout
+
+<PageTitle>Servis Rehberi — ApartNet</PageTitle>
+
+<div style="background:linear-gradient(90deg,#1B5E20,#2E7D32);color:white;padding:20px 16px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Handyman" Style="font-size:2rem" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h5" Style="font-weight:800">Servis & Firma Rehberi</MudText>
+                <MudText Typo="Typo.body2" Style="opacity:0.85">Apartman ve site yönetimi için güvenilir hizmet firmaları</MudText>
+            </MudStack>
+            <MudSpacer />
+            <MudButton Variant="Variant.Outlined" Color="Color.Inherit"
+                       StartIcon="@Icons.Material.Filled.AddBusiness"
+                       Style="border-color:rgba(255,255,255,0.6)">
+                Firmanızı Ekleyin
+            </MudButton>
+        </MudStack>
+    </MudContainer>
+</div>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-5">
+
+    @* Kategori Kartları *@
+    <MudText Typo="Typo.h6" Style="font-weight:700" Class="mb-3">Hizmet Kategorileri</MudText>
+    <MudGrid Spacing="3" Class="mb-6">
+        @foreach (var kat in _kategoriler)
+        {
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Elevation="@(_secili == kat.Ad ? 4 : 1)" Class="pa-3 text-center"
+                          Style="@($"cursor:pointer;border:2px solid {(_secili == kat.Ad ? "var(--mud-palette-primary)" : "transparent")}")"
+                          @onclick="@(() => _secili = _secili == kat.Ad ? null : kat.Ad)">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@kat.Icon" Color="@(_secili == kat.Ad ? Color.Primary : Color.Default)" Style="font-size:2rem" />
+                        <MudText Typo="Typo.caption" Style="font-weight:600;text-align:center">@kat.Ad</MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @* Firma Listesi *@
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+        <MudText Typo="Typo.h6" Style="font-weight:700">
+            @(_secili ?? "Tüm Firmalar")
+        </MudText>
+        @if (_secili is not null)
+        {
+            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _secili = null)">Tümünü Göster</MudButton>
+        }
+        <MudSpacer />
+        <MudText Typo="Typo.caption" Color="Color.Secondary">@FilteredFirmalar.Count() firma listelendi</MudText>
+    </MudStack>
+
+    <MudGrid Spacing="3">
+        @foreach (var firma in FilteredFirmalar)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="2" Style="height:100%">
+                    <MudCardHeader>
+                        <CardHeaderAvatar>
+                            <MudAvatar Color="Color.Primary" Style="font-weight:700">@firma.Ad[0]</MudAvatar>
+                        </CardHeaderAvatar>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.subtitle1" Style="font-weight:700">@firma.Ad</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Style="height:20px">@firma.Kategori</MudChip>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudTooltip Text="Doğrulanmış firma">
+                                <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Primary" Size="Size.Small"
+                                         Style="@(firma.Onaylı ? "" : "visibility:hidden")" />
+                            </MudTooltip>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudStack Spacing="1">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Color="Color.Secondary" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@firma.Sehir</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.body2">@firma.Aciklama</MudText>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="0">
+                                @for (int i = 0; i < 5; i++)
+                                {
+                                    var idx = i;
+                                    <MudIcon Icon="@(idx < firma.Puan ? Icons.Material.Filled.Star : Icons.Material.Outlined.Star)"
+                                             Style="font-size:16px;color:#FFC107" />
+                                }
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-1">(@firma.YorumSayisi yorum)</MudText>
+                            </MudStack>
+                        </MudStack>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Phone">İletişim</MudButton>
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small">Detay</MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+
+    @* Firma Ekle CTA *@
+    <MudPaper Elevation="1" Class="pa-5 mt-6" Style="background:#F5F5F5;text-align:center">
+        <MudIcon Icon="@Icons.Material.Filled.AddBusiness" Color="Color.Primary" Style="font-size:3rem" Class="mb-2" />
+        <MudText Typo="Typo.h6" Style="font-weight:700" Class="mb-1">Firmanızı Ekleyin</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+            Apartman ve site yöneticilerine ulaşmak için firmanızı ücretsiz listeleyin.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                   StartIcon="@Icons.Material.Filled.AddBusiness" Style="border-radius:24px">
+            Ücretsiz Firma Kaydı
+        </MudButton>
+    </MudPaper>
+
+</MudContainer>
+
+@code {
+    private string? _secili;
+
+    private IEnumerable<Firma> FilteredFirmalar =>
+        _secili is null ? _firmalar : _firmalar.Where(f => f.Kategori == _secili);
+
+    private record Kategori(string Ad, string Icon);
+    private static readonly Kategori[] _kategoriler =
+    [
+        new("Temizlik", Icons.Material.Filled.CleaningServices),
+        new("Boya & Badana", Icons.Material.Filled.FormatPaint),
+        new("Asansör", Icons.Material.Filled.Elevator),
+        new("Tadilat", Icons.Material.Filled.Construction),
+        new("Peyzaj", Icons.Material.Filled.Park),
+        new("Güvenlik", Icons.Material.Filled.Security),
+        new("Elektrik", Icons.Material.Filled.ElectricBolt),
+        new("Su & Tesisat", Icons.Material.Filled.Plumbing),
+        new("Isıtma", Icons.Material.Filled.Thermostat),
+        new("Çatı & Yalıtım", Icons.Material.Filled.Roofing),
+        new("Haşere", Icons.Material.Filled.BugReport),
+        new("Sigorta", Icons.Material.Filled.Shield),
+    ];
+
+    private record Firma(string Ad, string Kategori, string Sehir, string Aciklama, int Puan, int YorumSayisi, bool Onaylı);
+    private static readonly Firma[] _firmalar =
+    [
+        new("Temiz Bina Ltd.", "Temizlik", "İstanbul", "Apartman ve site ortak alan temizliği. Günlük, haftalık ve aylık sözleşme seçenekleri.", 5, 42, true),
+        new("Parlak Hizmet A.Ş.", "Temizlik", "Ankara", "Profesyonel ekipmanla site temizliği, cam silme ve bahçe bakımı.", 4, 28, true),
+        new("Renk Usta Boya", "Boya & Badana", "İstanbul", "Dış cephe, iç mekan boya ve mantolama hizmetleri. 10 yıl deneyim.", 5, 37, true),
+        new("Cephe Uzmanları", "Boya & Badana", "İzmir", "Dış cephe boya, taş yüzey kaplama ve onarım.", 4, 19, false),
+        new("Asansör Teknik Servis", "Asansör", "İstanbul", "Tüm marka asansör bakım, onarım ve periyodik muayene hizmetleri.", 5, 61, true),
+        new("Güven Asansör", "Asansör", "Ankara", "Hidrolik ve makinalı asansör bakımı. 7/24 acil servis.", 4, 33, true),
+        new("Ustalı Tadilat", "Tadilat", "İstanbul", "Komple daire ve bina tadilat, seramik, alçıpan ve doğrama hizmetleri.", 4, 24, false),
+        new("Yeşil Peyzaj", "Peyzaj", "İstanbul", "Site bahçe tasarımı, sulama sistemleri ve mevsimlik bakım.", 5, 18, true),
+        new("Güvenli Site Sistemleri", "Güvenlik", "İstanbul", "Kamera sistemi, kartlı geçiş ve interkom kurulumu.", 4, 45, true),
+        new("Elektrik Pro", "Elektrik", "Ankara", "Bina elektrik tesisatı, pano bakımı ve güçlendirme.", 5, 29, true),
+        new("Su Tesisatçı", "Su & Tesisat", "İzmir", "Boru değişimi, sızdırmazlık ve su tesisatı hizmetleri.", 4, 16, false),
+        new("Isıtma Sistemleri", "Isıtma", "İstanbul", "Kombi bakımı, kalorifer tesisatı ve doğalgaz dönüşümü.", 4, 22, true),
+    ];
+}

@@ -1,0 +1,231 @@
+@page "/bilgi/hukuki-cerceve"
+@layout PublicLayout
+
+<PageTitle>KMK Hukuki Rehber — ApartNet</PageTitle>
+
+<div style="background:linear-gradient(90deg,#B71C1C,#C62828);color:white;padding:20px 16px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Gavel" Style="font-size:2rem" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h5" Style="font-weight:800">KMK Hukuki Rehber</MudText>
+                <MudText Typo="Typo.body2" Style="opacity:0.85">Kat Mülkiyeti Kanunu 634 — Sade dilde, kapsamlı anlatım</MudText>
+            </MudStack>
+        </MudStack>
+    </MudContainer>
+</div>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-5">
+    <MudGrid Spacing="4">
+
+        @* Sol: İçindekiler *@
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="1" Class="pa-3" Style="position:sticky;top:16px">
+                <MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mb-2">İçindekiler</MudText>
+                <MudStack Spacing="0">
+                    @foreach (var (label, anchor) in _icerikler)
+                    {
+                        <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
+                                   Style="justify-content:flex-start;text-transform:none;font-size:13px"
+                                   Href="@($"#{anchor}")">
+                            @label
+                        </MudButton>
+                    }
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        @* Sağ: İçerik *@
+        <MudItem xs="12" md="9">
+            <MudStack Spacing="5">
+
+                @* Giriş *@
+                <MudPaper Elevation="1" Class="pa-5" id="giris">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Kat Mülkiyeti Kanunu Nedir?</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body1" Class="mb-2">
+                        <strong>634 Sayılı Kat Mülkiyeti Kanunu</strong>, 1965 yılında yürürlüğe girmiş olup apartman, site ve toplu yapılardaki
+                        bağımsız bölüm maliklerinin (kat malikleri) hak ve yükümlülüklerini düzenler.
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Kanun; mülkiyet yapısı, yönetim biçimi, gider paylaşımı, toplantı usulleri ve yaptırımlar dahil olmak üzere
+                        apartman yaşamının hemen her alanını kapsar.
+                    </MudText>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                        Bu rehber bilgilendirme amaçlıdır. Hukuki uyuşmazlıklarda avukatlık danışmanlığı alınması tavsiye edilir.
+                    </MudAlert>
+                </MudPaper>
+
+                @* Kat Malikleri Kurulu *@
+                <MudPaper Elevation="1" Class="pa-5" id="kat-malikleri-kurulu">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Groups" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Kat Malikleri Kurulu (Madde 27-33)</MudText>
+                    </MudStack>
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.body1"><strong>Nedir?</strong> Bir binadaki tüm kat maliklerinden oluşan en yetkili karar organıdır.</MudText>
+                        <MudDivider />
+                        @foreach (var m in _kmkMaddeler)
+                        {
+                            <MudStack Spacing="1">
+                                <MudChip T="string" Color="Color.Primary" Size="Size.Small" Style="width:fit-content">@m.Madde</MudChip>
+                                <MudText Typo="Typo.body2"><strong>@m.Baslik:</strong> @m.Aciklama</MudText>
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                @* Yönetici *@
+                <MudPaper Elevation="1" Class="pa-5" id="yonetici">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.ManageAccounts" Color="Color.Warning" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Yönetici Görev ve Sorumlulukları (Madde 34-42)</MudText>
+                    </MudStack>
+                    <MudGrid Spacing="3">
+                        @foreach (var (baslik, items) in _yoneticiGorevler)
+                        {
+                            <MudItem xs="12" sm="6">
+                                <MudPaper Outlined="true" Class="pa-3">
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight:700" Class="mb-2">@baslik</MudText>
+                                    <MudStack Spacing="1">
+                                        @foreach (var item in items)
+                                        {
+                                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudIcon Icon="@Icons.Material.Filled.ArrowRight" Size="Size.Small" Color="Color.Primary" />
+                                                <MudText Typo="Typo.body2">@item</MudText>
+                                            </MudStack>
+                                        }
+                                    </MudStack>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudPaper>
+
+                @* Aidat *@
+                <MudPaper Elevation="1" Class="pa-5" id="aidat">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Color="Color.Success" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Aidat ve Gider Paylaşımı (Madde 20-22)</MudText>
+                    </MudStack>
+                    <MudStack Spacing="2">
+                        <MudText Typo="Typo.body1">Kat malikleri, ortak giderlere <strong>arsa payları</strong> oranında katılmak zorundadır.</MudText>
+                        <MudGrid Spacing="2">
+                            @foreach (var (icon, color, baslik, aciklama) in _aidatBilgiler)
+                            {
+                                <MudItem xs="12" sm="6">
+                                    <MudAlert Icon="@icon" Severity="Severity.Normal" Dense="true" Style="@($"border-left:3px solid")">
+                                        <MudText Typo="Typo.body2"><strong>@baslik:</strong> @aciklama</MudText>
+                                    </MudAlert>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                        <MudAlert Severity="Severity.Warning" Dense="true">
+                            <strong>Kiracılar:</strong> Isıtma, asansör, su gibi kullanıma dayalı giderleri öder. Yönetim planında aksine hüküm yoksa temizlik, bakım giderleri kat malikine aittir.
+                        </MudAlert>
+                    </MudStack>
+                </MudPaper>
+
+                @* Toplu Yapı *@
+                <MudPaper Elevation="1" Class="pa-5" id="toplu-yapi">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Secondary" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Toplu Yapı Yönetimi (Madde 66-72)</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body1" Class="mb-3">
+                        Birden fazla yapıyı kapsayan büyük projelere uygulanır. Site, rezidans ve karma kullanımlı kompleksler bu kapsamdadır.
+                    </MudText>
+                    <MudStack Spacing="1">
+                        @foreach (var m in _topluYapi)
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">@m</MudText>
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+                @* Yargıtay Kararları *@
+                <MudPaper Elevation="1" Class="pa-5" id="yargitay">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Balance" Color="Color.Error" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Emsal Yargıtay Kararları</MudText>
+                    </MudStack>
+                    <MudStack Spacing="3">
+                        @foreach (var k in _yargitayKararlari)
+                        {
+                            <MudPaper Outlined="true" Class="pa-3" Style="border-left:3px solid var(--mud-palette-error)">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error" Style="height:22px;margin-bottom:8px">@k.Daire</MudChip>
+                                <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-1">@k.Konu</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@k.Ozet</MudText>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private static readonly (string Label, string Anchor)[] _icerikler =
+    [
+        ("KMK Nedir?", "giris"),
+        ("Kat Malikleri Kurulu", "kat-malikleri-kurulu"),
+        ("Yönetici Görev ve Sorumlulukları", "yonetici"),
+        ("Aidat ve Gider Paylaşımı", "aidat"),
+        ("Toplu Yapı Yönetimi", "toplu-yapi"),
+        ("Emsal Yargıtay Kararları", "yargitay"),
+    ];
+
+    private record KmkMadde(string Madde, string Baslik, string Aciklama);
+    private static readonly KmkMadde[] _kmkMaddeler =
+    [
+        new("Md. 27", "Yıllık Toplantı", "Kat malikleri kurulu her yıl olağan toplantı yapar. Yönetim planında aksine hüküm yoksa Ocak ayında toplanılır."),
+        new("Md. 29", "Yeter Sayı", "İlk toplantıda arsa payının yarısından fazlasını temsil eden kat malikleri gerekir. Sağlanamazsa 7 gün sonra toplantı yapılır, yeter sayı aranmaz."),
+        new("Md. 30", "Oy Hakkı", "Her kat maliki arsa payı oranında oy hakkına sahiptir. Bazı kararlar oy birliği gerektirir."),
+        new("Md. 33", "Hakimin Müdahalesi", "Kat malikleri kurulunca verilen karar haksızsa ilgili, 1 ay içinde sulh hukuk mahkemesine başvurabilir."),
+    ];
+
+    private static readonly (string Baslik, string[] Items)[] _yoneticiGorevler =
+    [
+        ("Yönetim Görevleri", new[] { "Bina yönetim planını uygulamak", "Ortak alanları yönetmek", "Yıllık bütçe hazırlamak", "Kat maliklerini temsil etmek" }),
+        ("Mali Görevler", new[] { "Aidat tahsilatı yapmak", "Gider hesabı tutmak", "Yıllık hesap raporu sunmak", "Denetim için defter tutmak" }),
+        ("Hukuki Yükümlülükler", new[] { "Sigorta yaptırmak", "Vergi ve harçları ödemek", "İcra takibi başlatmak", "İdari işlemleri yürütmek" }),
+        ("Bakım Görevleri", new[] { "Asansör periyodik bakımı", "Yangın sistemleri kontrolü", "Ortak alan temizliği", "Teknik arızaları gidermek" }),
+    ];
+
+    private static readonly (string Icon, Color Color, string Baslik, string Aciklama)[] _aidatBilgiler =
+    [
+        (Icons.Material.Filled.ArrowUpward, Color.Error, "Aidat ödenmezse", "Gecikme tazminatı işler, icra takibi başlatılabilir, ortak alan kullanımı kısıtlanabilir."),
+        (Icons.Material.Filled.Calculate, Color.Primary, "Hesaplama yöntemi", "Arsa payı oranı (varsayılan) veya yönetim planındaki özel oran esas alınır."),
+        (Icons.Material.Filled.Person, Color.Warning, "Kiracı & malik sorumluluğu", "Aidat borcu mülkle geçer; alıcı önceki borçtan da sorumlu olabilir."),
+        (Icons.Material.Filled.Gavel, Color.Success, "Yaptırımlar", "Borçlu malik aleyhine icra, ihtiyati tedbir ve tahliye davası açılabilir."),
+    ];
+
+    private static readonly string[] _topluYapi =
+    [
+        "Her yapı bloğunun kendi kat malikleri kurulu bulunur.",
+        "Blok temsilcileri bir araya gelerek Toplu Yapı Temsilciler Kurulu'nu oluşturur.",
+        "Ortak alanlar (yollar, peyzaj, havuz) tüm maliklerce paylaşılır.",
+        "Yönetim planı tüm maliklerin 4/5 çoğunluğuyla değiştirilebilir.",
+        "Her bloğun bütçesi ayrı tutulabilir; ortak giderler oran dahilinde paylaşılır.",
+    ];
+
+    private record YargitayKarar(string Daire, string Konu, string Ozet);
+    private static readonly YargitayKarar[] _yargitayKararlari =
+    [
+        new("Yargıtay 18. HD", "Aidat Borçlusu Ortak Alan Kullanamaz",
+            "Aidat borcunu ödemeyen kat maliki, yönetim kurulu kararıyla otopark ve havuz gibi ortak alanlardan yararlanmaktan kısıtlanabilir."),
+        new("Yargıtay 18. HD", "Yönetici İbrası",
+            "Yöneticinin ibra edilmesi, hesapların onaylanması anlamına gelir. İbra kararı yıllık toplantıda alınır ve sonraki yıl itiraz hakkı kısıtlıdır."),
+        new("Yargıtay 20. HD", "Balkon Kapatma",
+            "Ortak yer niteliğindeki balkon cephesini değiştiren tadilat, tüm kat maliklerinin muvafakati olmadan yapılamaz."),
+        new("Yargıtay 18. HD", "Kiracı Aidat Sorumluluğu",
+            "Isıtma ve asansör gibi kullanıma dayalı giderler kiracıdan tahsil edilebilir; ancak asıl borçlu kat malikidir."),
+    ];
+}
