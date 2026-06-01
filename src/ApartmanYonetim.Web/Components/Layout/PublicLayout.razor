@@ -1,0 +1,29 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudText Typo="Typo.h6" Style="font-weight:800;letter-spacing:-0.5px;cursor:pointer" @onclick='@(() => Nav.NavigateTo("/"))'>
+            <MudIcon Icon="@Icons.Material.Filled.Apartment" Class="mr-1" Style="vertical-align:middle" />
+            ApartNet
+        </MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/bilgi/hukuki-cerceve">Hukuki Rehber</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/bilgi/egitim">Eğitim</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/bilgi/servis-rehberi">Servis Rehberi</MudButton>
+        <MudDivider Vertical="true" Class="mx-2" Style="height:24px;opacity:0.3" />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/giris" Size="Size.Small">Yönetim Girişi</MudButton>
+    </MudAppBar>
+
+    <MudMainContent>
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    [Inject] NavigationManager Nav { get; set; } = default!;
+}

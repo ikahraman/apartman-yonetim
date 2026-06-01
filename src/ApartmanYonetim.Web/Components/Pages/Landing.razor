@@ -1,0 +1,259 @@
+@page "/"
+@layout PublicLayout
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+
+<PageTitle>ApartNet — Apartman & Site Yönetiminde Tek Adres</PageTitle>
+
+@* ─── HERO ───────────────────────────────────────────────────────────────── *@
+<div style="background:linear-gradient(135deg,#1565C0 0%,#0D47A1 60%,#01579B 100%);color:white;padding:80px 16px 96px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudStack AlignItems="AlignItems.Center" Spacing="4">
+            <MudIcon Icon="@Icons.Material.Filled.Apartment" Style="font-size:4rem;opacity:0.9" />
+            <MudText Typo="Typo.h2" Align="Align.Center" Style="font-weight:800;letter-spacing:-1px">
+                ApartNet
+            </MudText>
+            <MudText Typo="Typo.h5" Align="Align.Center" Style="opacity:0.9;font-weight:400;max-width:560px">
+                Apartman & Site Yönetiminde Tek Adres
+            </MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Style="opacity:0.75;max-width:480px">
+                KMK rehberi, sertifikalı eğitim, servis rehberi ve profesyonel yönetim sistemi — tek platformda.
+            </MudText>
+            <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap" Justify="Justify.Center" Class="mt-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Large"
+                           Href="/giris" StartIcon="@Icons.Material.Filled.Login"
+                           Style="font-weight:700;border-radius:24px;padding:12px 28px">
+                    Yönetim Sistemine Giriş
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Large"
+                           Style="border-radius:24px;padding:12px 28px;color:white;border-color:rgba(255,255,255,0.5)"
+                           OnClick="@ScrollToFeatures">
+                    Daha Fazla Bilgi
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudContainer>
+</div>
+
+@* ─── STATS ──────────────────────────────────────────────────────────────── *@
+<div style="background:#F5F5F5;padding:24px 16px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudGrid Spacing="0" Justify="Justify.Center">
+            @foreach (var (label, value, icon) in _stats)
+            {
+                <MudItem xs="6" sm="3">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="1" Class="pa-3">
+                        <MudIcon Icon="@icon" Color="Color.Primary" Style="font-size:2rem" />
+                        <MudText Typo="Typo.h5" Style="font-weight:700">@value</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">@label</MudText>
+                    </MudStack>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudContainer>
+</div>
+
+@* ─── BÖLÜMLER ───────────────────────────────────────────────────────────── *@
+<div id="features" style="padding:64px 16px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudText Typo="Typo.h4" Align="Align.Center" Style="font-weight:700" Class="mb-2">Ne Sunuyoruz?</MudText>
+        <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary" Class="mb-8">
+            Kat malikleri, yöneticiler ve yönetim firmalarına yönelik kapsamlı platform
+        </MudText>
+        <MudGrid Spacing="4">
+            @foreach (var f in _features)
+            {
+                <MudItem xs="12" sm="6" md="3">
+                    <MudCard Elevation="2" Style="height:100%">
+                        <MudCardContent>
+                            <MudStack Spacing="2">
+                                <MudIcon Icon="@f.Icon" Color="@f.Color" Style="font-size:2.5rem" />
+                                <MudText Typo="Typo.h6" Style="font-weight:700">@f.Title</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@f.Description</MudText>
+                            </MudStack>
+                        </MudCardContent>
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@f.Link" Size="Size.Small">
+                                İncele →
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudContainer>
+</div>
+
+@* ─── KİMLER İÇİN ────────────────────────────────────────────────────────── *@
+<div style="background:#F5F5F5;padding:64px 16px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudText Typo="Typo.h4" Align="Align.Center" Style="font-weight:700" Class="mb-2">Kimler İçin?</MudText>
+        <MudText Typo="Typo.body1" Align="Align.Center" Color="Color.Secondary" Class="mb-8">
+            Her rol için özel içerik ve araçlar
+        </MudText>
+        <MudGrid Spacing="4">
+            @foreach (var p in _personas)
+            {
+                <MudItem xs="12" sm="4">
+                    <MudPaper Elevation="2" Class="pa-5" Style="height:100%;border-top:4px solid;border-color:var(--mud-palette-primary)">
+                        <MudStack Spacing="2">
+                            <MudIcon Icon="@p.Icon" Color="Color.Primary" Style="font-size:2.5rem" />
+                            <MudText Typo="Typo.h6" Style="font-weight:700">@p.Title</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@p.Description</MudText>
+                            <MudStack Spacing="1" Class="mt-2">
+                                @foreach (var item in p.Items)
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">@item</MudText>
+                                    </MudStack>
+                                }
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudContainer>
+</div>
+
+@* ─── YAKINDA ─────────────────────────────────────────────────────────────── *@
+<div style="background:linear-gradient(135deg,#1B5E20 0%,#2E7D32 100%);color:white;padding:64px 16px">
+    <MudContainer MaxWidth="MaxWidth.Medium">
+        <MudStack AlignItems="AlignItems.Center" Spacing="3">
+            <MudChip T="string" Color="Color.Warning" Style="font-weight:700">Yakında</MudChip>
+            <MudText Typo="Typo.h4" Align="Align.Center" Style="font-weight:700">Sertifikalı Eğitim Programı</MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Style="opacity:0.85;max-width:500px">
+                Apartman yöneticileri ve yönetim firmaları için KMK kapsamlı sertifika programı geliyor.
+                Açık dersler ücretsiz, sertifika sınavı ücretli.
+            </MudText>
+            <MudGrid Spacing="2" Justify="Justify.Center" Class="mt-2">
+                @foreach (var badge in new[] { "KMK 634 Temelleri", "Yönetici Sorumlulukları", "Aidat Hukuku", "Toplantı & Karar" })
+                {
+                    <MudItem>
+                        <MudChip T="string" Variant="Variant.Outlined" Color="Color.Inherit" Style="color:white;border-color:rgba(255,255,255,0.5)">
+                            @badge
+                        </MudChip>
+                    </MudItem>
+                }
+            </MudGrid>
+            <MudButton Variant="Variant.Filled" Color="Color.Warning" Size="Size.Large"
+                       Style="font-weight:700;border-radius:24px;margin-top:8px"
+                       StartIcon="@Icons.Material.Filled.NotificationsActive">
+                Haberdar Et
+            </MudButton>
+        </MudStack>
+    </MudContainer>
+</div>
+
+@* ─── CTA ─────────────────────────────────────────────────────────────────── *@
+<div style="padding:64px 16px;text-align:center">
+    <MudContainer MaxWidth="MaxWidth.Small">
+        <MudText Typo="Typo.h4" Style="font-weight:700" Class="mb-3">Yönetim Sisteminizi Dijitalleştirin</MudText>
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-5">
+            Aidatlar, sakinler, arızalar, muhasebe — hepsi tek ekranda.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                   Href="/giris" StartIcon="@Icons.Material.Filled.Login"
+                   Style="border-radius:24px;padding:14px 36px;font-weight:700">
+            Ücretsiz Başla
+        </MudButton>
+    </MudContainer>
+</div>
+
+@* ─── FOOTER ─────────────────────────────────────────────────────────────── *@
+<div style="background:#212121;color:rgba(255,255,255,0.7);padding:32px 16px">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudGrid>
+            <MudItem xs="12" sm="4">
+                <MudText Typo="Typo.h6" Style="color:white;font-weight:700" Class="mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Apartment" Class="mr-1" Style="vertical-align:middle" />
+                    ApartNet
+                </MudText>
+                <MudText Typo="Typo.body2">Apartman & Site Yönetiminde Tek Adres</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudText Typo="Typo.subtitle2" Style="color:white" Class="mb-2">Platform</MudText>
+                <MudStack Spacing="1">
+                    <MudLink Href="/bilgi/hukuki-cerceve" Style="color:rgba(255,255,255,0.6)">Hukuki Rehber</MudLink>
+                    <MudLink Href="/bilgi/egitim" Style="color:rgba(255,255,255,0.6)">Eğitim</MudLink>
+                    <MudLink Href="/bilgi/servis-rehberi" Style="color:rgba(255,255,255,0.6)">Servis Rehberi</MudLink>
+                    <MudLink Href="/giris" Style="color:rgba(255,255,255,0.6)">Yönetim Sistemi</MudLink>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudText Typo="Typo.subtitle2" Style="color:white" Class="mb-2">İletişim</MudText>
+                <MudText Typo="Typo.body2">info@apartnet.com.tr</MudText>
+            </MudItem>
+        </MudGrid>
+        <MudDivider Class="my-4" Style="border-color:rgba(255,255,255,0.1)" />
+        <MudText Typo="Typo.caption" Align="Align.Center">
+            © @DateTime.Now.Year ApartNet. Tüm hakları saklıdır.
+        </MudText>
+    </MudContainer>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        if (auth.User.Identity?.IsAuthenticated == true)
+        {
+            var user = auth.User;
+            if (user.IsInRole("SuperAdmin"))
+                Nav.NavigateTo("/admin/firmalar");
+            else if (user.IsInRole("Resident") && !user.IsInRole("Manager") && !user.IsInRole("SiteStaff"))
+                Nav.NavigateTo("/sakin");
+            else
+                Nav.NavigateTo("/sitelerim");
+        }
+    }
+
+    private void ScrollToFeatures() => Nav.NavigateTo("/#features");
+
+    private static readonly (string Label, string Value, string Icon)[] _stats =
+    [
+        ("Desteklenen Site Türü", "3", Icons.Material.Filled.Apartment),
+        ("KMK Maddesi Rehberi", "634", Icons.Material.Filled.Gavel),
+        ("Yönetim Modülü", "7", Icons.Material.Filled.Dashboard),
+        ("7/24 Erişim", "∞", Icons.Material.Filled.CloudDone),
+    ];
+
+    private record Feature(string Icon, Color Color, string Title, string Description, string Link);
+    private static readonly Feature[] _features =
+    [
+        new(Icons.Material.Filled.Gavel, Color.Error,
+            "KMK Hukuki Rehber",
+            "Kat Mülkiyeti Kanunu'nun her maddesi sade dilde. Yargıtay kararları, şablonlar ve SSS.",
+            "/bilgi/hukuki-cerceve"),
+        new(Icons.Material.Filled.School, Color.Warning,
+            "Sertifikalı Eğitim",
+            "Apartman yöneticileri ve yönetim firmaları için online kurslar ve sertifika programı.",
+            "/bilgi/egitim"),
+        new(Icons.Material.Filled.Handyman, Color.Success,
+            "Servis Rehberi",
+            "Temizlik, boya, asansör bakım, tadilat — bölgenizdeki güvenilir firmalar.",
+            "/bilgi/servis-rehberi"),
+        new(Icons.Material.Filled.ManageAccounts, Color.Primary,
+            "Yönetim Sistemi",
+            "Aidat takibi, sakin yönetimi, arıza bildirimi, muhasebe ve duyurular — tek ekranda.",
+            "/giris"),
+    ];
+
+    private record Persona(string Icon, string Title, string Description, string[] Items);
+    private static readonly Persona[] _personas =
+    [
+        new(Icons.Material.Filled.Person,
+            "Kat Maliki",
+            "Mülkünüzle ilgili her şeyi öğrenin ve takip edin.",
+            ["Aidat geçmişinizi görün", "KMK'daki haklarınızı öğrenin", "Arıza bildirimi yapın", "Toplantı davetlerini takip edin"]),
+        new(Icons.Material.Filled.SupervisorAccount,
+            "Site / Apartman Yöneticisi",
+            "Yönetim sorumluluklarınızı kolayca yerine getirin.",
+            ["Yasal yükümlülüklerinizi öğrenin", "Toplantı tutanağı şablonları", "Sertifikalı eğitim alın", "Servis firması bulun"]),
+        new(Icons.Material.Filled.Business,
+            "Yönetim Firması",
+            "Portföyünüzü büyütün ve profesyonel yönetin.",
+            ["Çok siteli yönetim sistemi", "Ekip sertifika programı", "Müşteri eşleştirme (yakında)", "Kurumsal sertifika"]),
+    ];
+}
