@@ -1,0 +1,301 @@
+@page "/admin/faturalar"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@using ApartmanYonetim.Domain.Enums
+@inject ISiteObligationService ObligationService
+@inject IFirmRegistrationService FirmService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Faturalar & Ödemeler</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+
+    <!-- Özet Kartlar -->
+    <MudGrid Spacing="3" Class="mb-5">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4" Style="border-radius:12px; border-left:4px solid #1976d2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Aktif Site</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700; color:#1976d2">@_totalSites</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4" Style="border-radius:12px; border-left:4px solid #388e3c">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Tahakkuk</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700; color:#388e3c">@_totalDue.ToString("N0") ₺</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4" Style="border-radius:12px; border-left:4px solid #7b1fa2">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Ödenen</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700; color:#7b1fa2">@_totalPaid.ToString("N0") ₺</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="2" Class="pa-4" Style="border-radius:12px; border-left:4px solid #d32f2f">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Gecikmiş Ödeme</MudText>
+                <MudText Typo="Typo.h5" Style="font-weight:700; color:#d32f2f">@_overdueCount</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h6" Style="font-weight:700">Firma & Site Detayları</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Refresh"
+                   OnClick="RecalcAsync" Disabled="_recalcing">
+            @if (_recalcing) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+            Fiyatları Yenile
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudExpansionPanels MultiExpansion="true">
+            @for (int fi = 0; fi < _firms.Count; fi++)
+            {
+                var firm = _firms[fi];
+                var obs = _obligationsByFirm.GetValueOrDefault(firm.Slug) ?? [];
+                var colorSet = FirmColors[fi % FirmColors.Length];
+
+                var firmMonthly = obs.Sum(o => o.MonthlyAmount);
+                var firmDue     = obs.Sum(o => o.TotalDue);
+                var firmPaid    = obs.Sum(o => o.TotalPaid);
+                var firmOverdue = obs.Sum(o => o.OverdueCount);
+                var firmBalance = firmDue - firmPaid;
+
+                <MudExpansionPanel IsInitiallyExpanded="true"
+                    Style="@($"margin-bottom:12px; border-radius:8px; border:1px solid {colorSet.Border}; overflow:hidden")">
+                    <TitleContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Style="flex-wrap:wrap"
+                                  Style2="@($"background:{colorSet.Header}; margin:-12px; padding:12px 16px;")">
+                            <div style="@($"background:{colorSet.Header}; margin:-12px; padding:12px 16px; width:100%; display:flex; align-items:center; gap:8px; flex-wrap:wrap")">
+                                <MudIcon Icon="@Icons.Material.Filled.Business"
+                                         Style="@($"color:{colorSet.Icon}")" Size="Size.Small" />
+                                <MudText Typo="Typo.subtitle1"
+                                         Style="@($"font-weight:700; color:{colorSet.Text}; flex:1; min-width:150px")">
+                                    @firm.Name
+                                </MudText>
+                                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Style="flex-wrap:wrap">
+                                    <MudText Typo="Typo.caption" Style="@($"color:{colorSet.Muted}")">
+                                        @obs.Count site · @firmMonthly.ToString("N0") ₺/ay
+                                    </MudText>
+                                    @if (firmBalance > 0)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Error">
+                                            Kalan @firmBalance.ToString("N0") ₺
+                                        </MudChip>
+                                    }
+                                    else if (firmDue > 0)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Ödemeler tam</MudChip>
+                                    }
+                                    @if (firmOverdue > 0)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Error"
+                                                 Icon="@Icons.Material.Filled.Warning">
+                                            @firmOverdue gecikmiş
+                                        </MudChip>
+                                    }
+                                </MudStack>
+                            </div>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                        <div style="@($"background:{colorSet.Bg}")">
+                            @if (obs.Count == 0)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-3">Bu firmaya ait site yükümlülüğü yok.</MudText>
+                            }
+                            else
+                            {
+                                <MudTable T="SiteObligationDto" Items="obs" Hover="true" Elevation="0"
+                                          Dense="true" Style="background:transparent">
+                                    <HeaderContent>
+                                        <MudTh Style="font-size:11px;font-weight:600;opacity:.7">Site</MudTh>
+                                        <MudTh Style="font-size:11px;font-weight:600;opacity:.7">Tip</MudTh>
+                                        <MudTh Style="font-size:11px;font-weight:600;opacity:.7;text-align:right">Daire</MudTh>
+                                        <MudTh Style="font-size:11px;font-weight:600;opacity:.7;text-align:right">Aylık (₺)</MudTh>
+                                        <MudTh Style="font-size:11px;font-weight:600;opacity:.7;text-align:right">Tahakkuk (₺)</MudTh>
+                                        <MudTh Style="font-size:11px;font-weight:600;opacity:.7;text-align:right">Ödenen (₺)</MudTh>
+                                        <MudTh Style="font-size:11px;font-weight:600;opacity:.7;text-align:right">Kalan (₺)</MudTh>
+                                        <MudTh Style="font-size:11px;font-weight:600;opacity:.7">Durum</MudTh>
+                                        <MudTh></MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd>
+                                            <MudText Style="font-weight:600;font-size:13px">@context.SiteName</MudText>
+                                        </MudTd>
+                                        <MudTd>
+                                            <MudChip T="string" Size="Size.Small" Color="@SiteTypeColor(context.SiteType)">
+                                                @SiteTypeLabel(context.SiteType)
+                                            </MudChip>
+                                        </MudTd>
+                                        <MudTd Style="text-align:right">@context.DaireCount</MudTd>
+                                        <MudTd Style="text-align:right">
+                                            <strong>@context.MonthlyAmount.ToString("N0")</strong>
+                                        </MudTd>
+                                        <MudTd Style="text-align:right">@context.TotalDue.ToString("N0")</MudTd>
+                                        <MudTd Style="text-align:right">
+                                            <MudText Color="Color.Success">@context.TotalPaid.ToString("N0")</MudText>
+                                        </MudTd>
+                                        <MudTd Style="text-align:right">
+                                            @{ var balance = context.TotalDue - context.TotalPaid; }
+                                            <MudText Color="@(balance > 0 ? Color.Error : Color.Default)"
+                                                     Style="font-weight:600">
+                                                @balance.ToString("N0")
+                                            </MudText>
+                                        </MudTd>
+                                        <MudTd>
+                                            @if (context.OverdueCount > 0)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Error">
+                                                    @context.OverdueCount gecikmiş
+                                                </MudChip>
+                                            }
+                                            else if (context.PendingCount > 0)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                                                    @context.PendingCount bekliyor
+                                                </MudChip>
+                                            }
+                                            else
+                                            {
+                                                <MudText Color="Color.Success" Typo="Typo.body2">✓ Güncel</MudText>
+                                            }
+                                        </MudTd>
+                                        <MudTd>
+                                            <MudStack Row="true" Spacing="0">
+                                                <MudTooltip Text="Hızlı ödeme simülasyonu">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Payment"
+                                                                   Size="Size.Small" Color="Color.Success"
+                                                                   OnClick="@(() => OpenQuickPayment(context))" />
+                                                </MudTooltip>
+                                                <MudTooltip Text="Ödeme geçmişi">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.ReceiptLong"
+                                                                   Size="Size.Small" Color="Color.Primary"
+                                                                   OnClick="@(() => OpenPaymentsDialog(context))" />
+                                                </MudTooltip>
+                                            </MudStack>
+                                        </MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+
+                                <!-- Firma toplam satırı -->
+                                <MudPaper Elevation="0" Class="pa-2 mx-2 mb-2"
+                                          Style="@($"background:{colorSet.Header}; border-radius:6px")">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                                        <MudText Typo="Typo.caption" Style="@($"color:{colorSet.Text}; font-weight:700; flex:1")">
+                                            @firm.Name Toplamı
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Style="@($"color:{colorSet.Muted}")">
+                                            @firmMonthly.ToString("N0") ₺/ay
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Style="@($"color:{colorSet.Muted}")">
+                                            Tahakkuk: @firmDue.ToString("N0") ₺
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight:600">
+                                            Ödenen: @firmPaid.ToString("N0") ₺
+                                        </MudText>
+                                        <MudText Typo="Typo.caption"
+                                                 Color="@(firmBalance > 0 ? Color.Error : Color.Default)"
+                                                 Style="font-weight:700">
+                                            Kalan: @firmBalance.ToString("N0") ₺
+                                        </MudText>
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                        </div>
+                    </ChildContent>
+                </MudExpansionPanel>
+            }
+        </MudExpansionPanels>
+    }
+</MudContainer>
+
+@code {
+    private List<FirmRegDto> _firms = [];
+    private Dictionary<string, List<SiteObligationDto>> _obligationsByFirm = new();
+    private bool _loading = true, _recalcing;
+
+    private int _totalSites;
+    private decimal _totalDue, _totalPaid;
+    private int _overdueCount;
+
+    private record FirmColorSet(string Header, string Bg, string Border, string Icon, string Text, string Muted);
+    private static readonly FirmColorSet[] FirmColors =
+    [
+        new("#e3f0ff", "#f7fbff", "#90caf9", "#1565c0", "#0d47a1", "#5c85b5"),
+        new("#e8f5e9", "#f7fdf7", "#a5d6a7", "#2e7d32", "#1b5e20", "#4d8850"),
+        new("#fff3e0", "#fffaf4", "#ffcc80", "#e65100", "#bf360c", "#c07020"),
+        new("#f3e5f5", "#fdf6ff", "#ce93d8", "#6a1b9a", "#4a148c", "#8b4a9e"),
+        new("#e0f7fa", "#f4fdff", "#80deea", "#00695c", "#004d40", "#3d8c87"),
+    ];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _firms = await FirmService.GetAllAsync();
+        var allObs = await ObligationService.GetAllObligationsAsync();
+
+        _obligationsByFirm = new();
+        foreach (var f in _firms)
+            _obligationsByFirm[f.Slug] = allObs.Where(o => o.FirmSlug == f.Slug).ToList();
+
+        _totalSites = allObs.Count;
+        _totalDue = allObs.Sum(o => o.TotalDue);
+        _totalPaid = allObs.Sum(o => o.TotalPaid);
+        _overdueCount = allObs.Sum(o => o.OverdueCount);
+        _loading = false;
+    }
+
+    private async Task RecalcAsync()
+    {
+        _recalcing = true;
+        try
+        {
+            await ObligationService.RecalculateAllObligationsAsync();
+            Snackbar.Add("Fiyatlar yeniden hesaplandı.", Severity.Success);
+            await LoadAsync();
+        }
+        finally { _recalcing = false; }
+    }
+
+    private async Task OpenQuickPayment(SiteObligationDto ob)
+    {
+        var p = new DialogParameters<QuickPaymentDialog> { { x => x.Obligation, ob } };
+        var dialog = await DialogService.ShowAsync<QuickPaymentDialog>(
+            $"Ödeme — {ob.SiteName}", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled)
+        {
+            Snackbar.Add("Ödeme kaydedildi.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task OpenPaymentsDialog(SiteObligationDto ob)
+    {
+        var p = new DialogParameters<SiteObligationPaymentsDialog> { { x => x.Obligation, ob } };
+        var dialog = await DialogService.ShowAsync<SiteObligationPaymentsDialog>(
+            $"{ob.SiteName} — Ödeme Geçmişi", p,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        await dialog.Result;
+        await LoadAsync();
+    }
+
+    private static Color SiteTypeColor(SiteType t) => t switch
+    {
+        SiteType.Apartman => Color.Default, SiteType.TopluYapi => Color.Warning, _ => Color.Primary
+    };
+    private static string SiteTypeLabel(SiteType t) => t switch
+    {
+        SiteType.Apartman => "Apartman", SiteType.TopluYapi => "Toplu Yapı", _ => "Site"
+    };
+}

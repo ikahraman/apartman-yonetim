@@ -1,0 +1,192 @@
+@page "/admin/fiyatlandirma"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@using ApartmanYonetim.Domain.Enums
+@inject ISiteObligationService ObligationService
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>Fiyatlandırma</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
+    <MudText Typo="Typo.h5" Style="font-weight:700" Class="mb-6">Platform Fiyatlandırması</MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <!-- Birim Fiyatlar -->
+        <MudPaper Elevation="2" Class="pa-5 mb-4" Style="border-radius:12px">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.PriceChange" Color="Color.Primary" />
+                <MudText Typo="Typo.h6" Style="font-weight:700" Class="ml-2">Birim Fiyatlar</MudText>
+            </MudStack>
+
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" @bind-Value="_pricePerDaire"
+                                     Label="Daire Başına Aylık (₺)" Variant="Variant.Outlined"
+                                     Min="0" Format="N2"
+                                     AdornmentText="₺" Adornment="Adornment.End"
+                                     HelperText="Her daire için aylık platform ücreti" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" @bind-Value="_pricePerBlok"
+                                     Label="Blok Başına Aylık (₺)" Variant="Variant.Outlined"
+                                     Min="0" Format="N2"
+                                     AdornmentText="₺" Adornment="Adornment.End"
+                                     HelperText="Site ve Toplu Yapı için blok başına ek ücret" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" @bind-Value="_pricePerKisim"
+                                     Label="Kısım Başına Aylık (₺)" Variant="Variant.Outlined"
+                                     Min="0" Format="N2"
+                                     AdornmentText="₺" Adornment="Adornment.End"
+                                     HelperText="Toplu Yapı için kısım başına ek ücret" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" @bind-Value="_minimumMonthly"
+                                     Label="Minimum Aylık Ücret (₺)" Variant="Variant.Outlined"
+                                     Min="0" Format="N2"
+                                     AdornmentText="₺" Adornment="Adornment.End"
+                                     HelperText="Hesaplama bu değerin altına inmez" />
+                </MudItem>
+            </MudGrid>
+
+            @if (_config?.UpdatedAt != default)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-3">
+                    Son güncelleme: @_config.UpdatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    @if (_config.UpdatedBy is not null) { <text> · @_config.UpdatedBy</text> }
+                </MudText>
+            }
+        </MudPaper>
+
+        <!-- Formül Önizlemesi -->
+        <MudPaper Elevation="1" Class="pa-5 mb-4"
+                  Style="border-radius:12px; background:linear-gradient(135deg,#f8f9fa,#e9ecef)">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Calculate" Color="Color.Secondary" />
+                <MudText Typo="Typo.subtitle1" Style="font-weight:700" Class="ml-2">Fiyat Hesaplama Formülü</MudText>
+            </MudStack>
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="pa-3" Style="border-radius:8px; border:1px solid #dee2e6">
+                        <MudStack Spacing="1">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">Apartman</MudChip>
+                            <MudText Typo="Typo.caption" Style="font-family:monospace; color:#495057">
+                                daire × @_pricePerDaire.ToString("N0")₺
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                min @_minimumMonthly.ToString("N0")₺/ay
+                            </MudText>
+                            <MudDivider Class="my-1" />
+                            <MudText Typo="Typo.caption">
+                                Örnek (12 daire): <strong>@Math.Max(12 * _pricePerDaire, _minimumMonthly).ToString("N0") ₺/ay</strong>
+                            </MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="pa-3" Style="border-radius:8px; border:1px solid #dee2e6">
+                        <MudStack Spacing="1">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">Site</MudChip>
+                            <MudText Typo="Typo.caption" Style="font-family:monospace; color:#495057">
+                                daire × @_pricePerDaire.ToString("N0")₺ + blok × @_pricePerBlok.ToString("N0")₺
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                min @_minimumMonthly.ToString("N0")₺/ay
+                            </MudText>
+                            <MudDivider Class="my-1" />
+                            <MudText Typo="Typo.caption">
+                                Örnek (24 daire, 2 blok): <strong>@Math.Max(24 * _pricePerDaire + 2 * _pricePerBlok, _minimumMonthly).ToString("N0") ₺/ay</strong>
+                            </MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Elevation="0" Class="pa-3" Style="border-radius:8px; border:1px solid #dee2e6">
+                        <MudStack Spacing="1">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning">Toplu Yapı</MudChip>
+                            <MudText Typo="Typo.caption" Style="font-family:monospace; color:#495057">
+                                daire × @_pricePerDaire.ToString("N0")₺ + blok × @_pricePerBlok.ToString("N0")₺ + kısım × @_pricePerKisim.ToString("N0")₺
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                min @_minimumMonthly.ToString("N0")₺/ay
+                            </MudText>
+                            <MudDivider Class="my-1" />
+                            <MudText Typo="Typo.caption">
+                                Örnek (56 daire, 4 blok, 2 kısım): <strong>@Math.Max(56 * _pricePerDaire + 4 * _pricePerBlok + 2 * _pricePerKisim, _minimumMonthly).ToString("N0") ₺/ay</strong>
+                            </MudText>
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <!-- Kaydet -->
+        <MudStack Row="true" Spacing="2" JustifyContent="Justify.FlexEnd">
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="ResetAsync">
+                Değişiklikleri Geri Al
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveAsync" Disabled="_saving">
+                @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Kaydet ve Siteleri Güncelle
+            </MudButton>
+        </MudStack>
+
+        <MudAlert Severity="Severity.Info" Class="mt-3" Dense="true">
+            Kaydettiğinizde tüm aktif sitelerin aylık tutarları yeni fiyatlarla otomatik yeniden hesaplanır.
+        </MudAlert>
+    }
+</MudContainer>
+
+@code {
+    private SiteBillingConfigDto? _config;
+    private decimal _pricePerDaire, _pricePerBlok, _pricePerKisim, _minimumMonthly;
+    private bool _loading = true, _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _config = await ObligationService.GetBillingConfigAsync();
+        LoadFromConfig();
+        _loading = false;
+    }
+
+    private void LoadFromConfig()
+    {
+        if (_config is null) return;
+        _pricePerDaire = _config.PricePerDaire;
+        _pricePerBlok = _config.PricePerBlok;
+        _pricePerKisim = _config.PricePerKisim;
+        _minimumMonthly = _config.MinimumMonthly;
+    }
+
+    private async Task ResetAsync()
+    {
+        _config = await ObligationService.GetBillingConfigAsync();
+        LoadFromConfig();
+        Snackbar.Add("Değişiklikler geri alındı.", Severity.Info);
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name ?? "admin";
+            var cmd = new SiteBillingConfigCommand(_pricePerDaire, _pricePerBlok, _pricePerKisim,
+                _minimumMonthly, BillingPeriod.Monthly);
+            await ObligationService.UpdateBillingConfigAsync(cmd, user);
+            _config = await ObligationService.GetBillingConfigAsync();
+            Snackbar.Add("Fiyatlar kaydedildi. Tüm site tutarları güncellendi.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+}

@@ -1,0 +1,100 @@
+@using ApartmanYonetim.Domain.Enums
+@inject ISiteObligationService ObligationService
+@inject AuthenticationStateProvider AuthProvider
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Primary" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:700">@Obligation.SiteName</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@Obligation.FirmName</MudText>
+                </MudStack>
+            </MudStack>
+
+            <MudDivider />
+
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_periodLabel" Label="Dönem" Variant="Variant.Outlined"
+                                  Required="true" HelperText="örn: Haziran 2026" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" @bind-Value="_amount" Label="Ödeme Tutarı (₺)"
+                                     Variant="Variant.Outlined" Min="0" Format="N2"
+                                     AdornmentText="₺" Adornment="Adornment.End" />
+                </MudItem>
+            </MudGrid>
+
+            <MudPaper Elevation="0" Class="pa-3" Style="background:#f8f9fa; border-radius:8px; border:1px solid #e9ecef">
+                <MudStack Row="true" Spacing="2">
+                    <MudStack Spacing="0" Style="flex:1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Aylık Tutar</MudText>
+                        <MudText Typo="Typo.body1" Style="font-weight:700">@Obligation.MonthlyAmount.ToString("N0") ₺</MudText>
+                    </MudStack>
+                    <MudStack Spacing="0" Style="flex:1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Borç</MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Error" Style="font-weight:700">@Obligation.TotalDue.ToString("N0") ₺</MudText>
+                    </MudStack>
+                    <MudStack Spacing="0" Style="flex:1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Ödenen</MudText>
+                        <MudText Typo="Typo.body1" Color="Color.Success" Style="font-weight:700">@Obligation.TotalPaid.ToString("N0") ₺</MudText>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+
+            @if (_error is not null) { <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.CheckCircle"
+                   OnClick="ConfirmAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+            Ödeme Yapıldı
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public SiteObligationDto Obligation { get; set; } = default!;
+
+    private string _periodLabel = "";
+    private decimal _amount;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        var today = DateTime.Today;
+        _periodLabel = today.ToString("MMMM yyyy");
+        _amount = Obligation.MonthlyAmount;
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_periodLabel) || _amount <= 0)
+        { _error = "Dönem ve tutar zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name ?? "";
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var start = new DateOnly(today.Year, today.Month, 1);
+            var end = start.AddMonths(1).AddDays(-1);
+            var cmd = new ObligationPaymentCommand(
+                Obligation.Id, _periodLabel.Trim(),
+                start, end, _amount, _amount,
+                today, today,
+                ObligationPaymentStatus.Paid, "Hızlı ödeme simülasyonu", user);
+            await ObligationService.UpsertPaymentAsync(null, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

@@ -37,7 +37,6 @@ public static class DbSeeder
 
         await SeedPackages(db);
         await SeedBillingConfig(db);
-        await SeedBillingTiers(db);
 
         if (await db.FirmRegistrations.AnyAsync())
         {
@@ -471,18 +470,6 @@ public static class DbSeeder
         await db.SaveChangesAsync();
     }
 
-    private static async Task SeedBillingTiers(MainDbContext db)
-    {
-        if (await db.SiteBillingTiers.AnyAsync()) return;
-        db.SiteBillingTiers.AddRange(
-            new SiteBillingTier { MinDaire = 1,    MaxDaire = 40,   MonthlyAmount = 500m,  DisplayOrder = 1 },
-            new SiteBillingTier { MinDaire = 41,   MaxDaire = 100,  MonthlyAmount = 1000m, DisplayOrder = 2 },
-            new SiteBillingTier { MinDaire = 101,  MaxDaire = 200,  MonthlyAmount = 2000m, DisplayOrder = 3 },
-            new SiteBillingTier { MinDaire = 201,  MaxDaire = 3000, MonthlyAmount = 2500m, DisplayOrder = 4 },
-            new SiteBillingTier { MinDaire = 3001, MaxDaire = null, MonthlyAmount = 3000m, DisplayOrder = 5 }
-        );
-        await db.SaveChangesAsync();
-    }
 
     private static async Task SeedBillingConfig(MainDbContext db)
     {

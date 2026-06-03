@@ -166,7 +166,7 @@
         { _error = "Ad ve kısa ad zorunludur."; return; }
         _step++;
         if (_step == 2)
-            _monthlyFee = await ObligationService.CalculateMonthlyAsync(_floorCount * _unitsPerFloor);
+            _monthlyFee = await ObligationService.CalculateMonthlyAsync(SiteType.Apartman, _floorCount * _unitsPerFloor, 0, 0);
     }
 
     private void Prev() { _error = null; _step--; }

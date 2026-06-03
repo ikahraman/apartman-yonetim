@@ -8,64 +8,60 @@ namespace ApartmanYonetim.Infrastructure.Services;
 
 public class SiteObligationService(MainDbContext db) : ISiteObligationService
 {
-    // ── Tier Fiyatlandırma ────────────────────────────────────────────────────
+    // ── Fiyatlandırma Konfigürasyonu ──────────────────────────────────────────
 
-    public async Task<List<SiteBillingTierDto>> GetTiersAsync() =>
-        await db.SiteBillingTiers
-            .OrderBy(t => t.DisplayOrder)
-            .Select(t => new SiteBillingTierDto(t.Id, t.MinDaire, t.MaxDaire, t.MonthlyAmount, t.DisplayOrder))
-            .ToListAsync();
-
-    public async Task<SiteBillingTierDto> UpsertTierAsync(int? id, SiteBillingTierCommand cmd)
+    public async Task<SiteBillingConfigDto> GetBillingConfigAsync()
     {
-        SiteBillingTier tier;
-        if (id.HasValue)
-        {
-            tier = await db.SiteBillingTiers.FindAsync(id.Value) ?? throw new KeyNotFoundException();
-        }
-        else
-        {
-            tier = new SiteBillingTier();
-            db.SiteBillingTiers.Add(tier);
-        }
-        tier.MinDaire = cmd.MinDaire;
-        tier.MaxDaire = cmd.MaxDaire;
-        tier.MonthlyAmount = cmd.MonthlyAmount;
-        tier.DisplayOrder = cmd.DisplayOrder;
-        await db.SaveChangesAsync();
-        return new SiteBillingTierDto(tier.Id, tier.MinDaire, tier.MaxDaire, tier.MonthlyAmount, tier.DisplayOrder);
+        var cfg = await db.SiteBillingConfigs.FirstOrDefaultAsync()
+            ?? new SiteBillingConfig();
+        return new SiteBillingConfigDto(cfg.PricePerDaire, cfg.PricePerBlok, cfg.PricePerKisim,
+            cfg.MinimumMonthly, cfg.DefaultPeriod, cfg.UpdatedAt, cfg.UpdatedBy);
     }
 
-    public async Task DeleteTierAsync(int id)
+    public async Task UpdateBillingConfigAsync(SiteBillingConfigCommand cmd, string updatedBy)
     {
-        var tier = await db.SiteBillingTiers.FindAsync(id) ?? throw new KeyNotFoundException();
-        db.SiteBillingTiers.Remove(tier);
+        var cfg = await db.SiteBillingConfigs.FirstOrDefaultAsync();
+        if (cfg is null)
+        {
+            cfg = new SiteBillingConfig { Id = 1 };
+            db.SiteBillingConfigs.Add(cfg);
+        }
+        cfg.PricePerDaire = cmd.PricePerDaire;
+        cfg.PricePerBlok = cmd.PricePerBlok;
+        cfg.PricePerKisim = cmd.PricePerKisim;
+        cfg.MinimumMonthly = cmd.MinimumMonthly;
+        cfg.DefaultPeriod = cmd.DefaultPeriod;
+        cfg.UpdatedAt = DateTime.UtcNow;
+        cfg.UpdatedBy = updatedBy;
         await db.SaveChangesAsync();
+
+        await RecalculateAllObligationsAsync();
     }
 
-    public async Task<decimal> CalculateMonthlyAsync(int daireCount)
+    public async Task<decimal> CalculateMonthlyAsync(SiteType siteType, int daireCount, int blokCount, int kisimCount)
     {
-        var tiers = await db.SiteBillingTiers.OrderBy(t => t.DisplayOrder).ToListAsync();
-        return CalculateFromTiers(tiers, daireCount);
+        var cfg = await db.SiteBillingConfigs.FirstOrDefaultAsync() ?? new SiteBillingConfig();
+        return Calculate(cfg, siteType, daireCount, blokCount, kisimCount);
     }
 
     public async Task RecalculateAllObligationsAsync()
     {
-        var tiers = await db.SiteBillingTiers.OrderBy(t => t.DisplayOrder).ToListAsync();
+        var cfg = await db.SiteBillingConfigs.FirstOrDefaultAsync() ?? new SiteBillingConfig();
         var obs = await db.SiteObligations.Where(o => o.IsActive).ToListAsync();
         foreach (var ob in obs)
-            ob.MonthlyAmount = CalculateFromTiers(tiers, ob.DaireCount);
+            ob.MonthlyAmount = Calculate(cfg, ob.SiteType, ob.DaireCount, ob.BlokCount, ob.KisimCount);
         await db.SaveChangesAsync();
     }
 
-    private static decimal CalculateFromTiers(List<SiteBillingTier> tiers, int daireCount)
+    private static decimal Calculate(SiteBillingConfig cfg, SiteType siteType, int daireCount, int blokCount, int kisimCount)
     {
         if (daireCount <= 0) daireCount = 1;
-        var tier = tiers.FirstOrDefault(t =>
-            daireCount >= t.MinDaire && (t.MaxDaire == null || daireCount <= t.MaxDaire));
-        // Eğer hiç tier yoksa ya da eşleşme yoksa son tier'ın fiyatı
-        tier ??= tiers.OrderByDescending(t => t.MinDaire).FirstOrDefault();
-        return tier?.MonthlyAmount ?? 0m;
+        decimal amount = daireCount * cfg.PricePerDaire;
+        if (siteType is SiteType.Site or SiteType.TopluYapi)
+            amount += blokCount * cfg.PricePerBlok;
+        if (siteType == SiteType.TopluYapi)
+            amount += kisimCount * cfg.PricePerKisim;
+        return Math.Max(amount, cfg.MinimumMonthly);
     }
 
     // ── Yükümlülükler ─────────────────────────────────────────────────────────
@@ -99,8 +95,8 @@ public class SiteObligationService(MainDbContext db) : ISiteObligationService
         Guid siteId, string siteName, SiteType siteType,
         string firmSlug, int daireCount, int blokCount, int kisimCount)
     {
-        var tiers = await db.SiteBillingTiers.OrderBy(t => t.DisplayOrder).ToListAsync();
-        var monthly = CalculateFromTiers(tiers, daireCount);
+        var cfg = await db.SiteBillingConfigs.FirstOrDefaultAsync() ?? new SiteBillingConfig();
+        var monthly = Calculate(cfg, siteType, daireCount, blokCount, kisimCount);
 
         var existing = await db.SiteObligations.FirstOrDefaultAsync(o => o.SiteId == siteId);
         if (existing is not null)
@@ -119,7 +115,7 @@ public class SiteObligationService(MainDbContext db) : ISiteObligationService
             FirmSlug = firmSlug, SiteId = siteId, SiteName = siteName, SiteType = siteType,
             DaireCount = daireCount, BlokCount = blokCount, KisimCount = kisimCount,
             MonthlyAmount = monthly, BillingPeriod = BillingPeriod.Monthly,
-            PricePerDaire = 0, PricePerBlok = 0, PricePerKisim = 0
+            PricePerDaire = cfg.PricePerDaire, PricePerBlok = cfg.PricePerBlok, PricePerKisim = cfg.PricePerKisim
         };
         db.SiteObligations.Add(ob);
         await db.SaveChangesAsync();
@@ -132,9 +128,9 @@ public class SiteObligationService(MainDbContext db) : ISiteObligationService
     {
         var ob = await db.SiteObligations.FirstOrDefaultAsync(o => o.SiteId == siteId);
         if (ob is null) return;
-        var tiers = await db.SiteBillingTiers.OrderBy(t => t.DisplayOrder).ToListAsync();
+        var cfg = await db.SiteBillingConfigs.FirstOrDefaultAsync() ?? new SiteBillingConfig();
         ob.DaireCount = daireCount; ob.BlokCount = blokCount; ob.KisimCount = kisimCount;
-        ob.MonthlyAmount = CalculateFromTiers(tiers, daireCount);
+        ob.MonthlyAmount = Calculate(cfg, ob.SiteType, daireCount, blokCount, kisimCount);
         await db.SaveChangesAsync();
     }
 

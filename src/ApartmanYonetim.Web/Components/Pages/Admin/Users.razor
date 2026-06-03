@@ -2,7 +2,7 @@
 @attribute [Authorize(Roles = "SuperAdmin")]
 @inject UserManager<AppUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
-@inject ISiteManagementService SiteService
+@inject IFirmRegistrationService FirmService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -10,9 +10,12 @@
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
     <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h5" Style="font-weight:600">Kullanıcılar</MudText>
+        <MudText Typo="Typo.h5" Style="font-weight:700">Kullanıcılar</MudText>
         <MudSpacer />
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd" OnClick="OpenAddDialog">Kullanıcı Ekle</MudButton>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">@_totalCount kullanıcı</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="OpenAddDialog" Class="ml-2">Kullanıcı Ekle</MudButton>
     </MudStack>
 
     @if (_loading)
@@ -21,69 +24,190 @@
     }
     else
     {
-        <MudTable T="UserRowVm" Items="_users" Dense="true" Hover="true" Elevation="1">
-            <HeaderContent>
-                <MudTh>Ad Soyad</MudTh>
-                <MudTh>E-posta</MudTh>
-                <MudTh>Rol</MudTh>
-                <MudTh>Oluşturulma</MudTh>
-                <MudTh></MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd>@(context.DisplayName ?? "—")</MudTd>
-                <MudTd>@context.Email</MudTd>
-                <MudTd>
-                    @foreach (var role in context.Roles)
-                    {
-                        <MudChip T="string" Size="Size.Small" Color="@(role == "SuperAdmin" ? Color.Error : Color.Primary)">@role</MudChip>
-                    }
-                </MudTd>
-                <MudTd>@context.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</MudTd>
-                <MudTd>
-                    <MudStack Row="true" Spacing="0">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
-                        @if (context.Roles.Contains("SiteStaff") || context.Roles.Contains("Auditor") || context.Roles.Contains("Accountant"))
-                        {
-                            <MudTooltip Text="Site Erişimi">
-                                <MudIconButton Icon="@Icons.Material.Filled.AssignmentInd" Size="Size.Small" Color="Color.Secondary" OnClick="@(() => OpenSiteAssignmentDialog(context))" />
-                            </MudTooltip>
-                        }
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => DeleteAsync(context))" />
-                    </MudStack>
-                </MudTd>
-            </RowTemplate>
-            <NoRecordsContent>
-                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-3">Kullanıcı bulunamadı.</MudText>
-            </NoRecordsContent>
-        </MudTable>
+        <MudExpansionPanels MultiExpansion="true">
+
+            <!-- ─── SİSTEM KULLANICILARI (SuperAdmin + sahipsiz) ─── -->
+            @if (_systemUsers.Count > 0)
+            {
+                <MudExpansionPanel IsInitiallyExpanded="true"
+                    Style="margin-bottom:12px; border-radius:8px; border:1px solid #b0bec5; overflow:hidden">
+                    <TitleContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2"
+                                  Style="background:#eceff1; margin:-12px; padding:12px 16px;">
+                            <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Color="Color.Default" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight:700; flex:1">Sistem Yöneticileri</MudText>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@_systemUsers.Count kişi</MudChip>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                        <div style="background:#f9fafb">
+                            @UserTable(_systemUsers)
+                        </div>
+                    </ChildContent>
+                </MudExpansionPanel>
+            }
+
+            <!-- ─── FİRMA KULLANICILARI ─── -->
+            @for (int fi = 0; fi < _firms.Count; fi++)
+            {
+                var firm = _firms[fi];
+                var firmUsers = _usersByFirm.GetValueOrDefault(firm.Slug) ?? [];
+                var colorSet = FirmColors[fi % FirmColors.Length];
+
+                <MudExpansionPanel IsInitiallyExpanded="true"
+                    Style="@($"margin-bottom:12px; border-radius:8px; border:1px solid {colorSet.Border}; overflow:hidden")">
+                    <TitleContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2"
+                                  Style="@($"background:{colorSet.Header}; margin:-12px; padding:12px 16px;")">
+                            <MudIcon Icon="@Icons.Material.Filled.Business"
+                                     Style="@($"color:{colorSet.Icon}")" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle1"
+                                     Style="@($"font-weight:700; color:{colorSet.Text}; flex:1")">
+                                @firm.Name
+                            </MudText>
+                            <MudText Typo="Typo.caption" Style="@($"color:{colorSet.Muted}")">@firm.Slug</MudText>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                     Style="@($"border-color:{colorSet.Icon}; color:{colorSet.Icon}")">
+                                @firmUsers.Count kişi
+                            </MudChip>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                        <div style="@($"background:{colorSet.Bg}")">
+                            @if (firmUsers.Count == 0)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-3">Bu firmada kullanıcı yok.</MudText>
+                            }
+                            else
+                            {
+                                @UserTable(firmUsers)
+                            }
+                        </div>
+                    </ChildContent>
+                </MudExpansionPanel>
+            }
+
+            <!-- ─── BAĞIMSIZ (Firma atanmamış, sistem dışı) ─── -->
+            @if (_orphanUsers.Count > 0)
+            {
+                <MudExpansionPanel IsInitiallyExpanded="false"
+                    Style="margin-bottom:12px; border-radius:8px; border:1px solid #e0e0e0; overflow:hidden">
+                    <TitleContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2"
+                                  Style="background:#fafafa; margin:-12px; padding:12px 16px;">
+                            <MudIcon Icon="@Icons.Material.Filled.PersonOff" Color="Color.Default" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight:700; flex:1; color:#757575">Firma Atanmamış</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">@_orphanUsers.Count kişi</MudChip>
+                        </MudStack>
+                    </TitleContent>
+                    <ChildContent>
+                        <div style="background:#fafafa">@UserTable(_orphanUsers)</div>
+                    </ChildContent>
+                </MudExpansionPanel>
+            }
+
+        </MudExpansionPanels>
     }
 </MudContainer>
 
 @code {
-    private List<UserRowVm> _users = [];
+    private List<FirmRegDto> _firms = [];
+    private List<UserRowVm> _systemUsers = [];
+    private List<UserRowVm> _orphanUsers = [];
+    private Dictionary<string, List<UserRowVm>> _usersByFirm = new();
+    private int _totalCount;
     private bool _loading = true;
+
+    private record UserRowVm(string Id, string Email, string? DisplayName, List<string> Roles, DateTime CreatedAt, string? FirmSlug);
+
+    private record FirmColorSet(string Header, string Bg, string Border, string Icon, string Text, string Muted);
+    private static readonly FirmColorSet[] FirmColors =
+    [
+        new("#e3f0ff", "#f7fbff", "#90caf9", "#1565c0", "#0d47a1", "#5c85b5"),
+        new("#e8f5e9", "#f7fdf7", "#a5d6a7", "#2e7d32", "#1b5e20", "#4d8850"),
+        new("#fff3e0", "#fffaf4", "#ffcc80", "#e65100", "#bf360c", "#c07020"),
+        new("#f3e5f5", "#fdf6ff", "#ce93d8", "#6a1b9a", "#4a148c", "#8b4a9e"),
+        new("#e0f7fa", "#f4fdff", "#80deea", "#00695c", "#004d40", "#3d8c87"),
+    ];
 
     protected override async Task OnInitializedAsync() => await Reload();
 
     private async Task Reload()
     {
         _loading = true;
-        var users = UserManager.Users.ToList();
-        var rows = new List<UserRowVm>();
-        foreach (var u in users)
+        _firms = await FirmService.GetAllAsync();
+
+        var firmSlugs = _firms.Select(f => f.Slug).ToHashSet();
+        var allUsers = UserManager.Users.OrderBy(u => u.DisplayName).ToList();
+        _totalCount = allUsers.Count;
+
+        _systemUsers = []; _orphanUsers = []; _usersByFirm = new();
+        foreach (var f in _firms) _usersByFirm[f.Slug] = [];
+
+        foreach (var u in allUsers)
         {
-            var roles = await UserManager.GetRolesAsync(u);
-            rows.Add(new UserRowVm(u.Id, u.Email ?? "", u.DisplayName, roles.ToList(), u.CreatedAt, u.FirmSlug));
+            var roles = (await UserManager.GetRolesAsync(u)).ToList();
+            var vm = new UserRowVm(u.Id, u.Email ?? "", u.DisplayName, roles, u.CreatedAt, u.FirmSlug);
+
+            if (roles.Contains("SuperAdmin"))
+                _systemUsers.Add(vm);
+            else if (u.FirmSlug is not null && firmSlugs.Contains(u.FirmSlug))
+                _usersByFirm[u.FirmSlug].Add(vm);
+            else
+                _orphanUsers.Add(vm);
         }
-        _users = rows;
         _loading = false;
     }
+
+    private RenderFragment UserTable(List<UserRowVm> users) => __builder =>
+    {
+        <MudTable T="UserRowVm" Items="users" Hover="true" Elevation="0" Dense="true"
+                  Style="background:transparent">
+            <HeaderContent>
+                <MudTh Style="font-size:11px;font-weight:600;opacity:.7">Ad Soyad</MudTh>
+                <MudTh Style="font-size:11px;font-weight:600;opacity:.7">E-posta</MudTh>
+                <MudTh Style="font-size:11px;font-weight:600;opacity:.7">Rol</MudTh>
+                <MudTh Style="font-size:11px;font-weight:600;opacity:.7">Kayıt</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><MudText Style="font-weight:600">@(context.DisplayName ?? "—")</MudText></MudTd>
+                <MudTd><MudText Typo="Typo.body2">@context.Email</MudText></MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="1" Style="flex-wrap:wrap">
+                        @foreach (var role in context.Roles)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="@RoleColor(role)">@RoleLabel(role)</MudChip>
+                        }
+                    </MudStack>
+                </MudTd>
+                <MudTd><MudText Typo="Typo.caption" Color="Color.Secondary">@context.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy")</MudText></MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="0">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => OpenEditDialog(context))" />
+                        @if (context.Roles.Any(r => r is "SiteStaff" or "Auditor" or "Accountant"))
+                        {
+                            <MudTooltip Text="Site Erişimi">
+                                <MudIconButton Icon="@Icons.Material.Filled.AssignmentInd" Size="Size.Small"
+                                               Color="Color.Secondary"
+                                               OnClick="@(() => OpenSiteAssignmentDialog(context))" />
+                            </MudTooltip>
+                        }
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error" OnClick="@(() => DeleteAsync(context))" />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    };
 
     private async Task OpenAddDialog()
     {
         var allRoles = RoleManager.Roles.Select(r => r.Name!).ToList();
         var p = new DialogParameters<UserFormDialog> { { x => x.AllRoles, allRoles } };
-        var dialog = await DialogService.ShowAsync<UserFormDialog>("Kullanıcı Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var dialog = await DialogService.ShowAsync<UserFormDialog>("Kullanıcı Ekle", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         if (!(await dialog.Result)!.Canceled) await Reload();
     }
 
@@ -94,11 +218,10 @@
         var allRoles = RoleManager.Roles.Select(r => r.Name!).ToList();
         var p = new DialogParameters<UserFormDialog>
         {
-            { x => x.User, user },
-            { x => x.CurrentRoles, vm.Roles },
-            { x => x.AllRoles, allRoles }
+            { x => x.User, user }, { x => x.CurrentRoles, vm.Roles }, { x => x.AllRoles, allRoles }
         };
-        var dialog = await DialogService.ShowAsync<UserFormDialog>("Kullanıcı Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var dialog = await DialogService.ShowAsync<UserFormDialog>("Kullanıcı Düzenle", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         if (!(await dialog.Result)!.Canceled) await Reload();
     }
 
@@ -110,7 +233,8 @@
             { x => x.UserDisplayName, vm.DisplayName ?? vm.Email },
             { x => x.FirmSlug, vm.FirmSlug }
         };
-        await DialogService.ShowAsync<SiteAssignmentDialog>("Site Erişimi", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        await DialogService.ShowAsync<SiteAssignmentDialog>("Site Erişimi", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
     }
 
     private async Task DeleteAsync(UserRowVm vm)
@@ -122,5 +246,24 @@
         else Snackbar.Add(string.Join(", ", result.Errors.Select(e => e.Description)), Severity.Error);
     }
 
-    private record UserRowVm(string Id, string Email, string? DisplayName, List<string> Roles, DateTime CreatedAt, string? FirmSlug);
+    private static Color RoleColor(string role) => role switch
+    {
+        "SuperAdmin" => Color.Error,
+        "Manager"    => Color.Primary,
+        "SiteStaff"  => Color.Info,
+        "Accountant" => Color.Warning,
+        "Auditor"    => Color.Secondary,
+        "Resident"   => Color.Tertiary,
+        _            => Color.Default
+    };
+
+    private static string RoleLabel(string role) => role switch
+    {
+        "Manager"    => "Yönetici",
+        "SiteStaff"  => "Personel",
+        "Accountant" => "Muhasebe",
+        "Auditor"    => "Denetçi",
+        "Resident"   => "Sakin",
+        _            => role
+    };
 }

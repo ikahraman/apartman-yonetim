@@ -230,7 +230,7 @@
         { _error = "En az bir blok ve her bloğun kodu zorunludur."; return; }
         _step++;
         if (_step == 2)
-            _monthlyFee = await ObligationService.CalculateMonthlyAsync(_blocks.Sum(b => b.FloorCount * b.UnitsPerFloor));
+            _monthlyFee = await ObligationService.CalculateMonthlyAsync(SiteType.Site, _blocks.Sum(b => b.FloorCount * b.UnitsPerFloor), _blocks.Count, 0);
     }
 
     private void Prev() { _error = null; _step--; }

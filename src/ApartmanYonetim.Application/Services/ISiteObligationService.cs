@@ -2,8 +2,14 @@ using ApartmanYonetim.Domain.Enums;
 
 namespace ApartmanYonetim.Application.Services;
 
-public record SiteBillingTierDto(int Id, int MinDaire, int? MaxDaire, decimal MonthlyAmount, int DisplayOrder);
-public record SiteBillingTierCommand(int MinDaire, int? MaxDaire, decimal MonthlyAmount, int DisplayOrder);
+public record SiteBillingConfigDto(
+    decimal PricePerDaire, decimal PricePerBlok, decimal PricePerKisim,
+    decimal MinimumMonthly, BillingPeriod DefaultPeriod,
+    DateTime UpdatedAt, string? UpdatedBy);
+
+public record SiteBillingConfigCommand(
+    decimal PricePerDaire, decimal PricePerBlok, decimal PricePerKisim,
+    decimal MinimumMonthly, BillingPeriod DefaultPeriod);
 
 public record SiteObligationDto(
     int Id, string FirmSlug, string FirmName, Guid SiteId, string SiteName, SiteType SiteType,
@@ -26,11 +32,10 @@ public record ObligationPaymentCommand(
 
 public interface ISiteObligationService
 {
-    // Tier fiyatlandırma
-    Task<List<SiteBillingTierDto>> GetTiersAsync();
-    Task<SiteBillingTierDto> UpsertTierAsync(int? id, SiteBillingTierCommand cmd);
-    Task DeleteTierAsync(int id);
-    Task<decimal> CalculateMonthlyAsync(int daireCount);
+    // Fiyatlandırma konfigürasyonu
+    Task<SiteBillingConfigDto> GetBillingConfigAsync();
+    Task UpdateBillingConfigAsync(SiteBillingConfigCommand cmd, string updatedBy);
+    Task<decimal> CalculateMonthlyAsync(SiteType siteType, int daireCount, int blokCount, int kisimCount);
     Task RecalculateAllObligationsAsync();
 
     // Yükümlülükler

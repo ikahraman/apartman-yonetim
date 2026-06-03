@@ -11,7 +11,6 @@ public class MainDbContext(DbContextOptions<MainDbContext> options) : IdentityDb
     public DbSet<FirmSubscription> FirmSubscriptions => Set<FirmSubscription>();
     public DbSet<FirmPaymentRecord> FirmPaymentRecords => Set<FirmPaymentRecord>();
     public DbSet<SiteBillingConfig> SiteBillingConfigs => Set<SiteBillingConfig>();
-    public DbSet<SiteBillingTier> SiteBillingTiers => Set<SiteBillingTier>();
     public DbSet<SiteObligation> SiteObligations => Set<SiteObligation>();
     public DbSet<SiteObligationPayment> SiteObligationPayments => Set<SiteObligationPayment>();
     public DbSet<SystemAuditLog> SystemAuditLogs => Set<SystemAuditLog>();
@@ -68,12 +67,6 @@ public class MainDbContext(DbContextOptions<MainDbContext> options) : IdentityDb
             b.Property(p => p.AmountDue).HasColumnType("decimal(10,2)");
             b.Property(p => p.AmountPaid).HasColumnType("decimal(10,2)");
             b.Property(p => p.Notes).HasMaxLength(1000);
-        });
-
-        builder.Entity<SiteBillingTier>(b =>
-        {
-            b.HasKey(t => t.Id);
-            b.Property(t => t.MonthlyAmount).HasColumnType("decimal(10,2)");
         });
 
         builder.Entity<SiteBillingConfig>(b =>
