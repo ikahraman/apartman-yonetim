@@ -2,7 +2,6 @@
 @attribute [Authorize(Roles = "Manager")]
 @inject IManagementCompanyService CompanyService
 @inject AuthenticationStateProvider AuthProvider
-@inject ISnackbar Snackbar
 
 <PageTitle>Firma Profili</PageTitle>
 
@@ -19,29 +18,48 @@
     }
     else
     {
-        <MudPaper Elevation="2" Class="pa-4">
-            <MudStack Spacing="3">
-                <MudTextField @bind-Value="_name" Label="Firma Adı" Variant="Variant.Outlined" Required="true" />
-                <MudTextField @bind-Value="_email" Label="E-posta" Variant="Variant.Outlined" InputType="InputType.Email" />
-                <MudTextField @bind-Value="_phone" Label="Telefon" Variant="Variant.Outlined" />
-                <MudTextField @bind-Value="_address" Label="Adres" Variant="Variant.Outlined" Lines="2" />
-                <MudTextField @bind-Value="_contactPerson" Label="Yetkili Kişi" Variant="Variant.Outlined"
-                              HelperText="Firma adına sorumlu kişinin adı" />
-                <MudTextField @bind-Value="_website" Label="Web Sitesi" Variant="Variant.Outlined"
-                              InputType="InputType.Url" HelperText="örn: https://www.firmaniz.com" />
-                <MudTextField @bind-Value="_logoUrl" Label="Logo URL" Variant="Variant.Outlined"
-                              HelperText="Firma logosu için genel erişilebilir URL" />
+        <MudPaper Elevation="2" Class="pa-5" Style="border-radius:12px">
+            <MudStack Spacing="4">
 
-                <MudStack Row="true" Spacing="1">
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">Slug:</MudText>
-                    <MudText Typo="Typo.caption" Style="font-family:monospace">@_company.Slug</MudText>
+                <!-- Logo + İsim -->
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                    @if (_company.LogoUrl is not null)
+                    {
+                        <MudAvatar Style="width:56px;height:56px">
+                            <MudImage Src="@_company.LogoUrl" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar Color="Color.Primary" Style="width:56px;height:56px;font-size:22px">
+                            @(_company.Name.Length > 0 ? _company.Name[0].ToString().ToUpper() : "F")
+                        </MudAvatar>
+                    }
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h6" Style="font-weight:700">@_company.Name</MudText>
+                        <MudText Typo="Typo.caption" Style="font-family:monospace" Color="Color.Secondary">
+                            @_company.Slug
+                        </MudText>
+                    </MudStack>
                 </MudStack>
 
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
-                           OnClick="SaveAsync" Disabled="_saving">
-                    @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
-                    Kaydet
-                </MudButton>
+                <MudDivider />
+
+                <!-- İletişim Bilgileri -->
+                <MudStack Spacing="2">
+                    @InfoRow(Icons.Material.Filled.Person, "Yetkili", _company.ContactPerson)
+                    @InfoRow(Icons.Material.Filled.Email, "E-posta", _company.Email)
+                    @InfoRow(Icons.Material.Filled.Phone, "Telefon", _company.Phone)
+                    @InfoRow(Icons.Material.Filled.LocationOn, "Adres", _company.Address)
+                    @InfoRow(Icons.Material.Filled.Language, "Web", _company.Website)
+                </MudStack>
+
+                <MudDivider />
+
+                <MudAlert Severity="Severity.Info" Dense="true" Icon="@Icons.Material.Filled.Lock">
+                    Firma bilgilerini değiştirmek için sistem yöneticisiyle iletişime geçin.
+                </MudAlert>
+
             </MudStack>
         </MudPaper>
     }
@@ -49,9 +67,7 @@
 
 @code {
     private CompanyDto? _company;
-    private string _name = "", _email = "", _phone = "", _address = "";
-    private string _contactPerson = "", _website = "", _logoUrl = "";
-    private bool _loading = true, _saving;
+    private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -59,31 +75,16 @@
         var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
         var companies = await CompanyService.GetForUserAsync(userId);
         _company = companies.FirstOrDefault();
-        if (_company is not null)
-        {
-            _name = _company.Name; _email = _company.Email ?? "";
-            _phone = _company.Phone ?? ""; _address = _company.Address ?? "";
-            _contactPerson = _company.ContactPerson ?? "";
-            _website = _company.Website ?? "";
-            _logoUrl = _company.LogoUrl ?? "";
-        }
         _loading = false;
     }
 
-    private async Task SaveAsync()
+    private RenderFragment InfoRow(string icon, string label, string? value) => __builder =>
     {
-        if (_company is null) return;
-        _saving = true;
-        try
-        {
-            await CompanyService.UpdateAsync(_company.Id, new CompanyCommand(
-                _name, _company.Slug, _email, _phone, _address,
-                string.IsNullOrWhiteSpace(_contactPerson) ? null : _contactPerson,
-                string.IsNullOrWhiteSpace(_website) ? null : _website,
-                string.IsNullOrWhiteSpace(_logoUrl) ? null : _logoUrl));
-            Snackbar.Add("Firma bilgileri güncellendi.", Severity.Success);
-        }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
-        finally { _saving = false; }
-    }
+        if (string.IsNullOrWhiteSpace(value)) return;
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@icon" Size="Size.Small" Color="Color.Secondary" Style="opacity:.6" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="min-width:60px">@label</MudText>
+            <MudText Typo="Typo.body2">@value</MudText>
+        </MudStack>;
+    };
 }

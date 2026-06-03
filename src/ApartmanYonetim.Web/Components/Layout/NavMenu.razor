@@ -1,59 +1,100 @@
 <MudNavMenu>
     <AuthorizeView>
         <Authorized>
-            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Ana Sayfa</MudNavLink>
 
-            <!-- ── MANAGER ─────────────────────────────────── -->
+            <!-- ── Kullanıcı Bilgisi ───────────────────────── -->
+            <div class="pa-3" style="background:var(--mud-palette-primary);color:#fff;margin-bottom:4px">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.body2" Style="font-weight:700;color:#fff">
+                        @(context.User.FindFirst("DisplayName")?.Value ?? context.User.Identity?.Name ?? "Kullanıcı")
+                    </MudText>
+                    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Style="border-color:rgba(255,255,255,.6);color:#fff;height:20px;font-size:10px">
+                            @RoleLabel(context.User)
+                        </MudChip>
+                        @if (context.User.FindFirst("firm_slug")?.Value is { } slug)
+                        {
+                            <MudText Typo="Typo.caption" Style="opacity:.75;color:#fff">@slug</MudText>
+                        }
+                    </MudStack>
+                </MudStack>
+            </div>
+
+            <!-- ── Ana Sayfa ───────────────────────────────── -->
+            <MudNavLink Href="/" Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Home" IconColor="Color.Primary">
+                Ana Sayfa
+            </MudNavLink>
+
+            <!-- ══ MANAGER ════════════════════════════════════ -->
             <AuthorizeView Roles="Manager" Context="_m">
-                <MudDivider Class="my-2" />
-                <MudNavGroup Title="Yönetim" Icon="@Icons.Material.Filled.Apartment" Expanded="true">
-                    <MudNavLink Href="/sitelerim" Icon="@Icons.Material.Filled.Apartment">Sitelerim</MudNavLink>
-                    <MudNavLink Href="/firma/site-ekle" Icon="@Icons.Material.Filled.AddHome">Yeni Site Ekle</MudNavLink>
-                </MudNavGroup>
-                <MudDivider Class="my-2" />
-                <MudNavGroup Title="Raporlar" Icon="@Icons.Material.Filled.BarChart" Expanded="false">
-                    <MudNavLink Href="/firma/ozet" Icon="@Icons.Material.Filled.Dashboard">Genel Özet</MudNavLink>
-                </MudNavGroup>
-                <MudDivider Class="my-2" />
-                <MudNavGroup Title="Firmam" Icon="@Icons.Material.Filled.Business" Expanded="false">
-                    <MudNavLink Href="/firma/profil" Icon="@Icons.Material.Filled.Edit">Firma Profili</MudNavLink>
-                    <MudNavLink Href="/firma/personel" Icon="@Icons.Material.Filled.People">Personel</MudNavLink>
-                    <MudNavLink Href="/firma/sozlesmeler" Icon="@Icons.Material.Filled.Assignment">Sözleşmeler</MudNavLink>
-                    <MudNavLink Href="/firma/faturalama" Icon="@Icons.Material.Filled.Receipt">Faturalama</MudNavLink>
-                    <MudNavLink Href="/firma/abonelik" Icon="@Icons.Material.Filled.CreditCard">Aboneliğim</MudNavLink>
-                </MudNavGroup>
+
+                <NavSection Label="SİTELER" />
+                <MudNavLink Href="/sitelerim" Icon="@Icons.Material.Filled.Apartment" IconColor="Color.Primary">
+                    Sitelerim
+                </MudNavLink>
+                <MudNavLink Href="/firma/site-ekle" Icon="@Icons.Material.Filled.AddHome" IconColor="Color.Primary">
+                    Yeni Site Ekle
+                </MudNavLink>
+
+                <NavSection Label="FİRMAM" />
+                <MudNavLink Href="/firma/ozet" Icon="@Icons.Material.Filled.Dashboard" IconColor="Color.Secondary">
+                    Genel Özet
+                </MudNavLink>
+                <MudNavLink Href="/firma/personel" Icon="@Icons.Material.Filled.People" IconColor="Color.Secondary">
+                    Personel
+                </MudNavLink>
+                <MudNavLink Href="/firma/sozlesmeler" Icon="@Icons.Material.Filled.Assignment" IconColor="Color.Secondary">
+                    Sözleşmeler
+                </MudNavLink>
+                <MudNavLink Href="/firma/faturalama" Icon="@Icons.Material.Filled.Receipt" IconColor="Color.Secondary">
+                    Faturalama
+                </MudNavLink>
+                <MudNavLink Href="/firma/profil" Icon="@Icons.Material.Filled.Info" IconColor="Color.Default">
+                    Firma Profili
+                </MudNavLink>
             </AuthorizeView>
 
-            <!-- ── SİTESTAFF / AUDİTOR / ACCOUNTANT ───────── -->
+            <!-- ══ SiteStaff / Auditor / Accountant ═══════════ -->
             <AuthorizeView Roles="SiteStaff,Auditor,Accountant" Context="_s">
-                <MudDivider Class="my-2" />
-                <MudNavGroup Title="Yönetim" Icon="@Icons.Material.Filled.Apartment" Expanded="true">
-                    <MudNavLink Href="/sitelerim" Icon="@Icons.Material.Filled.Apartment">Sitelerim</MudNavLink>
-                </MudNavGroup>
+                <NavSection Label="SİTELER" />
+                <MudNavLink Href="/sitelerim" Icon="@Icons.Material.Filled.Apartment" IconColor="Color.Primary">
+                    Sitelerim
+                </MudNavLink>
             </AuthorizeView>
 
-            <!-- ── RESIDENT ───────────────────────────────── -->
+            <!-- ══ Resident ════════════════════════════════════ -->
             <AuthorizeView Roles="Resident" Context="_r">
-                <MudDivider Class="my-2" />
-                <MudNavLink Href="/sakin" Icon="@Icons.Material.Filled.Home">Sakin Portali</MudNavLink>
+                <NavSection Label="SAKIN" />
+                <MudNavLink Href="/sakin" Icon="@Icons.Material.Filled.Home" IconColor="Color.Primary">
+                    Sakin Portali
+                </MudNavLink>
             </AuthorizeView>
 
-            <!-- ── SUPERADMIN ─────────────────────────────── -->
+            <!-- ══ SUPERADMIN ══════════════════════════════════ -->
             <AuthorizeView Roles="SuperAdmin" Context="_a">
-                <MudDivider Class="my-2" />
-                <MudNavGroup Title="Yönetim" Icon="@Icons.Material.Filled.Apartment" Expanded="true">
-                    <MudNavLink Href="/sitelerim" Icon="@Icons.Material.Filled.Apartment">Sitelerim</MudNavLink>
-                </MudNavGroup>
-                <MudDivider Class="my-2" />
-                <MudNavGroup Title="Sistem Yönetimi" Icon="@Icons.Material.Filled.AdminPanelSettings" Expanded="true">
-                    <MudNavLink Href="/admin/firmalar" Icon="@Icons.Material.Filled.Business">Firmalar</MudNavLink>
-                    <MudNavLink Href="/admin/siteler" Icon="@Icons.Material.Filled.Apartment">Tüm Siteler</MudNavLink>
-                    <MudNavLink Href="/admin/kullanicilar" Icon="@Icons.Material.Filled.People">Kullanıcılar</MudNavLink>
-                    <MudDivider Class="my-1" />
-                    <MudNavLink Href="/admin/fiyatlandirma" Icon="@Icons.Material.Filled.PriceChange">Fiyatlandırma</MudNavLink>
-                    <MudNavLink Href="/admin/faturalar" Icon="@Icons.Material.Filled.AccountBalance">Faturalar & Ödemeler</MudNavLink>
-                </MudNavGroup>
+
+                <NavSection Label="PLATFORM" />
+                <MudNavLink Href="/admin/firmalar" Icon="@Icons.Material.Filled.Business" IconColor="Color.Primary">
+                    Firmalar
+                </MudNavLink>
+                <MudNavLink Href="/admin/siteler" Icon="@Icons.Material.Filled.Apartment" IconColor="Color.Primary">
+                    Tüm Siteler
+                </MudNavLink>
+                <MudNavLink Href="/admin/kullanicilar" Icon="@Icons.Material.Filled.People" IconColor="Color.Primary">
+                    Kullanıcılar
+                </MudNavLink>
+
+                <NavSection Label="FİNANS" />
+                <MudNavLink Href="/admin/fiyatlandirma" Icon="@Icons.Material.Filled.PriceChange" IconColor="Color.Warning">
+                    Fiyatlandırma
+                </MudNavLink>
+                <MudNavLink Href="/admin/faturalar" Icon="@Icons.Material.Filled.AccountBalance" IconColor="Color.Warning">
+                    Faturalar & Ödemeler
+                </MudNavLink>
             </AuthorizeView>
+
         </Authorized>
 
         <NotAuthorized>
@@ -61,3 +102,16 @@
         </NotAuthorized>
     </AuthorizeView>
 </MudNavMenu>
+
+@code {
+    private static string RoleLabel(System.Security.Claims.ClaimsPrincipal user)
+    {
+        if (user.IsInRole("SuperAdmin"))  return "SuperAdmin";
+        if (user.IsInRole("Manager"))     return "Yönetici";
+        if (user.IsInRole("SiteStaff"))   return "Personel";
+        if (user.IsInRole("Accountant"))  return "Muhasebe";
+        if (user.IsInRole("Auditor"))     return "Denetçi";
+        if (user.IsInRole("Resident"))    return "Sakin";
+        return "Kullanıcı";
+    }
+}
