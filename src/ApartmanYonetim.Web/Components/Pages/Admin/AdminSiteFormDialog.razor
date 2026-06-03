@@ -1,15 +1,31 @@
 @inject IFirmRegistrationService FirmService
+@inject IFirmSubscriptionService SubService
 
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="3">
             <MudText Typo="Typo.subtitle1" Style="font-weight:600">Temel Bilgiler</MudText>
-            <MudSelect @bind-Value="_firmSlug" Label="Firma" Required="true" Variant="Variant.Outlined">
+            <MudSelect Value="_firmSlug" Label="Firma" Required="true" Variant="Variant.Outlined"
+                       ValueChanged="@((string v) => OnFirmChanged(v))">
                 @foreach (var f in Firms)
                 {
                     <MudSelectItem Value="@f.Slug">@f.Name</MudSelectItem>
                 }
             </MudSelect>
+
+            @if (_limitBlocked)
+            {
+                <MudAlert Severity="Severity.Error" Icon="@Icons.Material.Filled.Block">
+                    <strong>Paket Limiti Doldu!</strong> Bu firma mevcut paketinde en fazla <strong>@_limitMax</strong> site yönetebilir.
+                    Şu anda <strong>@_limitCurrent</strong> aktif sitesi var. Yeni site eklemek için paketi yükseltin.
+                </MudAlert>
+            }
+            else if (_limitWarning)
+            {
+                <MudAlert Severity="Severity.Warning" Icon="@Icons.Material.Filled.Warning">
+                    Bu firmanın <strong>@_limitCurrent / @_limitMax</strong> site kullanıyor. Paket limitine yaklaşıldı.
+                </MudAlert>
+            }
             <MudTextField @bind-Value="_name" Label="Site Adı" Required="true" Variant="Variant.Outlined" />
             <MudTextField @bind-Value="_slug" Label="Slug" Required="true" Variant="Variant.Outlined" />
             <MudSelect @bind-Value="_siteType" Label="Site Tipi" Variant="Variant.Outlined">
@@ -87,15 +103,32 @@
     private string? _error;
     private bool _busy;
 
-    protected override void OnParametersSet()
+    private bool _limitBlocked;
+    private bool _limitWarning;
+    private int _limitCurrent;
+    private int? _limitMax;
+
+    protected override async Task OnParametersSetAsync()
     {
-        if (Firms.Any()) _firmSlug = Firms[0].Slug;
+        if (Firms.Any()) await OnFirmChanged(Firms[0].Slug);
+    }
+
+    private async Task OnFirmChanged(string slug)
+    {
+        _firmSlug = slug;
+        _limitBlocked = false; _limitWarning = false;
+        if (string.IsNullOrEmpty(slug)) return;
+        var (allowed, current, max) = await SubService.CheckSiteLimitAsync(slug);
+        _limitCurrent = current; _limitMax = max;
+        _limitBlocked = !allowed;
+        _limitWarning = allowed && max.HasValue && current >= max.Value - 1;
     }
 
     private async Task SubmitAsync()
     {
         if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_firmSlug))
         { _error = "Firma ve site adı zorunludur."; return; }
+        if (_limitBlocked) { _error = "Bu firma paket limitine ulaştı. Yeni site eklenemiyor."; return; }
         _busy = true; _error = null;
         try
         {

@@ -1,0 +1,89 @@
+@page "/firma/profil"
+@attribute [Authorize(Roles = "Manager")]
+@inject IManagementCompanyService CompanyService
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+
+<PageTitle>Firma Profili</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-4">
+    <MudText Typo="Typo.h5" Style="font-weight:700" Class="mb-4">Firma Profili</MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_company is null)
+    {
+        <MudAlert Severity="Severity.Warning">Firma bilgisi bulunamadı.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_name" Label="Firma Adı" Variant="Variant.Outlined" Required="true" />
+                <MudTextField @bind-Value="_email" Label="E-posta" Variant="Variant.Outlined" InputType="InputType.Email" />
+                <MudTextField @bind-Value="_phone" Label="Telefon" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_address" Label="Adres" Variant="Variant.Outlined" Lines="2" />
+                <MudTextField @bind-Value="_contactPerson" Label="Yetkili Kişi" Variant="Variant.Outlined"
+                              HelperText="Firma adına sorumlu kişinin adı" />
+                <MudTextField @bind-Value="_website" Label="Web Sitesi" Variant="Variant.Outlined"
+                              InputType="InputType.Url" HelperText="örn: https://www.firmaniz.com" />
+                <MudTextField @bind-Value="_logoUrl" Label="Logo URL" Variant="Variant.Outlined"
+                              HelperText="Firma logosu için genel erişilebilir URL" />
+
+                <MudStack Row="true" Spacing="1">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Slug:</MudText>
+                    <MudText Typo="Typo.caption" Style="font-family:monospace">@_company.Slug</MudText>
+                </MudStack>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                           OnClick="SaveAsync" Disabled="_saving">
+                    @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                    Kaydet
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private CompanyDto? _company;
+    private string _name = "", _email = "", _phone = "", _address = "";
+    private string _contactPerson = "", _website = "", _logoUrl = "";
+    private bool _loading = true, _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var companies = await CompanyService.GetForUserAsync(userId);
+        _company = companies.FirstOrDefault();
+        if (_company is not null)
+        {
+            _name = _company.Name; _email = _company.Email ?? "";
+            _phone = _company.Phone ?? ""; _address = _company.Address ?? "";
+            _contactPerson = _company.ContactPerson ?? "";
+            _website = _company.Website ?? "";
+            _logoUrl = _company.LogoUrl ?? "";
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_company is null) return;
+        _saving = true;
+        try
+        {
+            await CompanyService.UpdateAsync(_company.Id, new CompanyCommand(
+                _name, _company.Slug, _email, _phone, _address,
+                string.IsNullOrWhiteSpace(_contactPerson) ? null : _contactPerson,
+                string.IsNullOrWhiteSpace(_website) ? null : _website,
+                string.IsNullOrWhiteSpace(_logoUrl) ? null : _logoUrl));
+            Snackbar.Add("Firma bilgileri güncellendi.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+}

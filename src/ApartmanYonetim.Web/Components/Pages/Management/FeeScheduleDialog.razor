@@ -1,4 +1,5 @@
 @inject ISiteFeeService FeeService
+@inject ISiteResidentService ResidentService
 
 <MudDialog>
     <DialogContent>
@@ -14,18 +15,36 @@
             <MudDatePicker @bind-Date="_startDate" Label="Başlangıç Tarihi" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
             <MudSelect @bind-Value="_distributionType" Label="Dağıtım Tipi" Variant="Variant.Outlined"
                        HelperText="Aidat tutarı nasıl hesaplansın?">
-                <MudSelectItem Value="DistributionType.EsitPay">Eşit Pay (her daireye eşit)</MudSelectItem>
+                <MudSelectItem Value="DistributionType.EsitPay">Eşit Pay</MudSelectItem>
                 <MudSelectItem Value="DistributionType.MetreKare">m² Oranında</MudSelectItem>
                 <MudSelectItem Value="DistributionType.ArsaPayi">Arsa Payı Oranında</MudSelectItem>
             </MudSelect>
-            <MudSelect @bind-Value="_appliesToUnitType" Label="Daire Türü Filtresi" Variant="Variant.Outlined"
-                       Clearable="true" HelperText="Boş = tüm türlere uygulanır">
+
+            <MudDivider />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Filtreler (boş = tüm birimlere uygulanır)</MudText>
+
+            <MudSelect @bind-Value="_appliesToUnitType" Label="Yapı Türü Filtresi"
+                       Variant="Variant.Outlined" Clearable="true">
                 <MudSelectItem Value="@((UnitType?)null)">Tüm Türler</MudSelectItem>
                 <MudSelectItem Value="@((UnitType?)UnitType.Daire)">Yalnız Daire</MudSelectItem>
                 <MudSelectItem Value="@((UnitType?)UnitType.Dukkan)">Yalnız Dükkan</MudSelectItem>
                 <MudSelectItem Value="@((UnitType?)UnitType.Depo)">Yalnız Depo</MudSelectItem>
                 <MudSelectItem Value="@((UnitType?)UnitType.Otopark)">Yalnız Otopark</MudSelectItem>
             </MudSelect>
+
+            @if (_daireTypes.Count > 0)
+            {
+                <MudSelect @bind-Value="_appliesToDaireTypeId" Label="Daire Tipi Filtresi"
+                           Variant="Variant.Outlined" Clearable="true"
+                           HelperText="Örn: sadece 2+1 dairelere uygula">
+                    <MudSelectItem Value="@((Guid?)null)">Tüm Tipler</MudSelectItem>
+                    @foreach (var dt in _daireTypes)
+                    {
+                        <MudSelectItem Value="@((Guid?)dt.Id)">@dt.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
             @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
         </MudStack>
     </DialogContent>
@@ -44,17 +63,22 @@
     [Parameter] public FeeScheduleDto? Schedule { get; set; }
 
     private string _name = "";
-    private decimal _amount = 0;
+    private decimal _amount;
     private FeePeriod _period = FeePeriod.Monthly;
     private int _dueDay = 10;
     private DateTime? _startDate = new DateTime(DateTime.Now.Year, 1, 1);
     private DistributionType _distributionType = DistributionType.EsitPay;
     private UnitType? _appliesToUnitType;
+    private Guid? _appliesToDaireTypeId;
+    private List<DaireTypeDto> _daireTypes = [];
     private string? _error;
     private bool _busy;
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
+        if (!string.IsNullOrEmpty(DbFilePath))
+            _daireTypes = await ResidentService.GetDaireTypesAsync(DbFilePath);
+
         if (Schedule is not null)
         {
             _name = Schedule.Name; _amount = Schedule.Amount;
@@ -62,6 +86,7 @@
             _startDate = Schedule.StartDate.ToDateTime(TimeOnly.MinValue);
             _distributionType = Schedule.DistributionType;
             _appliesToUnitType = Schedule.AppliesToUnitType;
+            _appliesToDaireTypeId = Schedule.AppliesToDaireTypeId;
         }
     }
 
@@ -72,7 +97,8 @@
         try
         {
             var start = DateOnly.FromDateTime(_startDate ?? DateTime.Today);
-            var cmd = new FeeScheduleCommand(_name.Trim(), _amount, _period, _dueDay, start, null, _distributionType, _appliesToUnitType);
+            var cmd = new FeeScheduleCommand(_name.Trim(), _amount, _period, _dueDay, start, null,
+                _distributionType, _appliesToUnitType, _appliesToDaireTypeId);
             if (Schedule is null) await FeeService.AddScheduleAsync(DbFilePath, cmd);
             else await FeeService.UpdateScheduleAsync(DbFilePath, Schedule.Id, cmd);
             MudDialog.Close(DialogResult.Ok(true));

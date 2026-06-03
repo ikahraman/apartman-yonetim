@@ -1,0 +1,297 @@
+@page "/admin/abonelikler/{FirmSlug}"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IFirmSubscriptionService SubService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Abonelik Detayı</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/admin/abonelikler"))" />
+        <MudText Typo="Typo.h5" Style="font-weight:700">
+            @(_sub?.FirmName ?? FirmSlug) — Abonelik
+        </MudText>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_sub is null)
+    {
+        <MudAlert Severity="Severity.Warning">Bu firmaya ait abonelik kaydı bulunamadı.</MudAlert>
+        <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="OpenCreateSubscription">Abonelik Oluştur</MudButton>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <!-- Sol: Abonelik Bilgisi -->
+            <MudItem xs="12" md="5">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight:700">Abonelik Bilgisi</MudText>
+                    <MudStack Spacing="3">
+                        <MudSelect T="int" @bind-Value="_editPackageId" Label="Paket"
+                                   Variant="Variant.Outlined" Required="true">
+                            @foreach (var pkg in _packages)
+                            {
+                                <MudSelectItem Value="pkg.Id">
+                                    @pkg.Name (@(pkg.MaxSiteCount.HasValue ? $"{pkg.MinSiteCount}-{pkg.MaxSiteCount}" : $"{pkg.MinSiteCount}+") site — @(pkg.MonthlyPrice == 0 ? "Özel" : $"{pkg.MonthlyPrice:N0} ₺"))
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+
+                        <MudDatePicker @bind-Date="_editStart" Label="Sözleşme Başlangıç"
+                                       Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+                        <MudDatePicker @bind-Date="_editEnd" Label="Sözleşme Bitiş (boş = belirsiz)"
+                                       Variant="Variant.Outlined" DateFormat="dd.MM.yyyy"
+                                       Clearable="true" />
+
+                        <MudNumericField @bind-Value="_editCustomPrice" Label="Özel Aylık Ücret (₺, boş = paket fiyatı)"
+                                         Variant="Variant.Outlined" Clearable="true" Min="0" />
+
+                        <MudSelect T="SubscriptionStatus" @bind-Value="_editStatus"
+                                   Label="Durum" Variant="Variant.Outlined">
+                            <MudSelectItem Value="SubscriptionStatus.Trial">Deneme</MudSelectItem>
+                            <MudSelectItem Value="SubscriptionStatus.Active">Aktif</MudSelectItem>
+                            <MudSelectItem Value="SubscriptionStatus.Overdue">Gecikmiş</MudSelectItem>
+                            <MudSelectItem Value="SubscriptionStatus.Suspended">Askıya Alındı</MudSelectItem>
+                            <MudSelectItem Value="SubscriptionStatus.Cancelled">İptal</MudSelectItem>
+                        </MudSelect>
+
+                        <MudTextField @bind-Value="_editNotes" Label="Notlar" Lines="3"
+                                      Variant="Variant.Outlined" />
+
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                   FullWidth="true" OnClick="SaveSubscription" Disabled="_saving">
+                            @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                            Kaydet
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+
+                <!-- Özet Kartı -->
+                <MudPaper Elevation="2" Class="pa-4 mt-3">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-2">Özet</MudText>
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Aktif Site</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">
+                                @_sub.ActiveSiteCount @(_sub.MaxSiteCount.HasValue ? $"/ {_sub.MaxSiteCount}" : "")
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Aylık Ücret</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight:600">
+                                @_sub.EffectiveMonthlyPrice.ToString("N0") ₺
+                                @if (_sub.CustomMonthlyPrice.HasValue) { <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-1">Özel</MudChip> }
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Son Değişiklik</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @(_sub.LastModifiedBy ?? "—") @(_sub.LastModifiedAt?.ToString("dd.MM.yyyy") ?? "")
+                            </MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Sağ: Ödeme Geçmişi -->
+            <MudItem xs="12" md="7">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Ödeme Geçmişi</MudText>
+                        <MudSpacer />
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="OpenAddPayment">Kayıt Ekle</MudButton>
+                    </MudStack>
+
+                    @if (_payments.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Info">Henüz ödeme kaydı yok.</MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable Items="_payments" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Dönem</MudTh>
+                                <MudTh>Borç</MudTh>
+                                <MudTh>Ödenen</MudTh>
+                                <MudTh>Son Tarih</MudTh>
+                                <MudTh>Durum</MudTh>
+                                <MudTh></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@MonthName(context.PeriodMonth) @context.PeriodYear</MudTd>
+                                <MudTd>@context.AmountDue.ToString("N0") ₺</MudTd>
+                                <MudTd>
+                                    @if (context.AmountPaid > 0)
+                                    {
+                                        <MudText Color="Color.Success">@context.AmountPaid.ToString("N0") ₺</MudText>
+                                    }
+                                    else
+                                    {
+                                        <MudText Color="Color.Secondary">—</MudText>
+                                    }
+                                </MudTd>
+                                <MudTd>@context.DueDate.ToString("dd.MM.yyyy")</MudTd>
+                                <MudTd>
+                                    <MudChip T="string" Size="Size.Small"
+                                             Color="@PaymentColor(context.PaymentStatus)"
+                                             Variant="Variant.Filled">
+                                        @PaymentLabel(context.PaymentStatus)
+                                    </MudChip>
+                                </MudTd>
+                                <MudTd>
+                                    <MudStack Row="true" Spacing="0">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                                       Size="Size.Small" Color="Color.Primary"
+                                                       OnClick="@(() => OpenEditPayment(context))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                                       Size="Size.Small" Color="Color.Error"
+                                                       OnClick="@(() => DeletePayment(context))" />
+                                    </MudStack>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public string FirmSlug { get; set; } = default!;
+
+    private SubscriptionDto? _sub;
+    private List<PackageDto> _packages = [];
+    private List<PaymentRecordDto> _payments = [];
+    private bool _loading = true;
+    private bool _saving;
+
+    // Edit state
+    private int _editPackageId;
+    private DateTime? _editStart;
+    private DateTime? _editEnd;
+    private decimal? _editCustomPrice;
+    private SubscriptionStatus _editStatus;
+    private string? _editNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _packages = await SubService.GetPackagesAsync();
+        _sub = await SubService.GetSubscriptionByFirmAsync(FirmSlug);
+        _payments = await SubService.GetPaymentRecordsAsync(FirmSlug);
+        if (_sub is not null) LoadEditState(_sub);
+        _loading = false;
+    }
+
+    private void LoadEditState(SubscriptionDto s)
+    {
+        _editPackageId = s.FirmPackageId;
+        _editStart = s.ContractStartDate.ToDateTime(TimeOnly.MinValue);
+        _editEnd = s.ContractEndDate?.ToDateTime(TimeOnly.MinValue);
+        _editCustomPrice = s.CustomMonthlyPrice;
+        _editStatus = s.Status;
+        _editNotes = s.Notes;
+    }
+
+    private async Task SaveSubscription()
+    {
+        if (_sub is null) return;
+        _saving = true;
+        try
+        {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            var userName = authState.User.FindFirst(ClaimTypes.Email)?.Value ?? "admin";
+            var cmd = new SubscriptionCommand(
+                FirmSlug, _editPackageId,
+                DateOnly.FromDateTime(_editStart ?? DateTime.Today),
+                _editEnd.HasValue ? DateOnly.FromDateTime(_editEnd.Value) : null,
+                _editCustomPrice, _editStatus, _editNotes);
+            await SubService.UpdateSubscriptionAsync(_sub.Id, cmd, userName);
+            Snackbar.Add("Abonelik güncellendi.", Severity.Success);
+            await OnInitializedAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private async Task OpenCreateSubscription()
+    {
+        var p = new DialogParameters<SubscriptionFormDialog> { { x => x.FirmSlug, FirmSlug } };
+        var dialog = await DialogService.ShowAsync<SubscriptionFormDialog>("Abonelik Oluştur", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await OnInitializedAsync();
+    }
+
+    private async Task OpenAddPayment()
+    {
+        var p = new DialogParameters<PaymentRecordDialog>
+        {
+            { x => x.FirmSlug, FirmSlug },
+            { x => x.DefaultAmount, _sub?.EffectiveMonthlyPrice ?? 0 }
+        };
+        var dialog = await DialogService.ShowAsync<PaymentRecordDialog>("Ödeme Kaydı Ekle", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await OnInitializedAsync();
+    }
+
+    private async Task OpenEditPayment(PaymentRecordDto rec)
+    {
+        var p = new DialogParameters<PaymentRecordDialog>
+        {
+            { x => x.FirmSlug, FirmSlug },
+            { x => x.Record, rec },
+            { x => x.DefaultAmount, rec.AmountDue }
+        };
+        var dialog = await DialogService.ShowAsync<PaymentRecordDialog>("Ödeme Kaydını Düzenle", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await OnInitializedAsync();
+    }
+
+    private async Task DeletePayment(PaymentRecordDto rec)
+    {
+        var options = new DialogOptions { MaxWidth = MaxWidth.ExtraSmall };
+        var p = new DialogParameters { ["Message"] = $"{MonthName(rec.PeriodMonth)} {rec.PeriodYear} ödeme kaydını silmek istiyor musunuz?" };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Kaydı Sil", p, options);
+        if (!(await dialog.Result)!.Canceled)
+        {
+            await SubService.DeletePaymentRecordAsync(rec.Id);
+            Snackbar.Add("Kayıt silindi.", Severity.Success);
+            await OnInitializedAsync();
+        }
+    }
+
+    private static string MonthName(int m) => m switch
+    {
+        1 => "Ocak", 2 => "Şubat", 3 => "Mart", 4 => "Nisan",
+        5 => "Mayıs", 6 => "Haziran", 7 => "Temmuz", 8 => "Ağustos",
+        9 => "Eylül", 10 => "Ekim", 11 => "Kasım", 12 => "Aralık",
+        _ => m.ToString()
+    };
+
+    private static Color PaymentColor(PaymentRecordStatus s) => s switch
+    {
+        PaymentRecordStatus.Paid    => Color.Success,
+        PaymentRecordStatus.Partial => Color.Warning,
+        PaymentRecordStatus.Overdue => Color.Error,
+        _                           => Color.Default
+    };
+
+    private static string PaymentLabel(PaymentRecordStatus s) => s switch
+    {
+        PaymentRecordStatus.Paid    => "Ödendi",
+        PaymentRecordStatus.Partial => "Kısmi",
+        PaymentRecordStatus.Overdue => "Gecikmiş",
+        PaymentRecordStatus.Pending => "Bekliyor",
+        _ => s.ToString()
+    };
+}

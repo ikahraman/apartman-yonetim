@@ -13,4 +13,5 @@ public class SiteFeeSchedule
     public bool IsActive { get; set; } = true;
     public DistributionType DistributionType { get; set; } = DistributionType.EsitPay;
     public UnitType? AppliesToUnitType { get; set; }
+    public Guid? AppliesToDaireTypeId { get; set; }
 }

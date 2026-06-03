@@ -11,7 +11,7 @@ public class FirmDbContextFactory(string baseDirectory = "FirmDatabases")
     public FirmDbContext Create(string dbFilePath)
     {
         var opts = new DbContextOptionsBuilder<FirmDbContext>()
-            .UseSqlite($"Data Source={dbFilePath}")
+            .UseSqlite($"Data Source={dbFilePath};Cache=Shared;Mode=ReadWriteCreate")
             .Options;
         return new FirmDbContext(opts);
     }
@@ -25,6 +25,8 @@ public class FirmDbContextFactory(string baseDirectory = "FirmDatabases")
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var db = Create(path);
         await db.Database.MigrateAsync();
+        // WAL modu dosya seviyesinde kalıcı — ilk oluşturmada bir kere yeterli
+        await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
         return db;
     }
 }

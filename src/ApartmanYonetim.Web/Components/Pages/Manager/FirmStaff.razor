@@ -1,0 +1,167 @@
+@page "/firma/personel"
+@attribute [Authorize(Roles = "Manager")]
+@using ApartmanYonetim.Domain.Enums
+@inject IFirmStaffService StaffService
+@inject ISiteManagementService SiteService
+@inject AuthenticationStateProvider AuthProvider
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Personel Yönetimi</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h5" Style="font-weight:700">Personel Yönetimi</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="OpenAddDialog">Personel Ekle</MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_staff.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Henüz personel kaydı bulunmuyor.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="_staff" Hover="true" Elevation="2">
+            <HeaderContent>
+                <MudTh>Ad Soyad</MudTh>
+                <MudTh>E-posta</MudTh>
+                <MudTh>Rol</MudTh>
+                <MudTh>Erişimli Siteler</MudTh>
+                <MudTh>Durum</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd><MudText Style="font-weight:600">@context.DisplayName</MudText></MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@RoleColor(context.Role)"
+                             Variant="Variant.Filled">
+                        @RoleLabel(context.Role)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    @if (context.SiteNames.Count == 0)
+                    {
+                        <MudText Color="Color.Secondary" Typo="Typo.caption">Tüm siteler</MudText>
+                    }
+                    else
+                    {
+                        <MudStack Row="true" Spacing="1" Style="flex-wrap:wrap">
+                            @foreach (var s in context.SiteNames)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default">@s</MudChip>
+                            }
+                        </MudStack>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.IsActive ? Color.Success : Color.Default)">
+                        @(context.IsActive ? "Aktif" : "Devre Dışı")
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="0">
+                        <MudIconButton Icon="@Icons.Material.Filled.ManageAccounts" Size="Size.Small"
+                                       Color="Color.Primary" Title="Site erişimini düzenle"
+                                       OnClick="@(() => OpenAccessDialog(context))" />
+                        @if (context.IsActive)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.PersonOff" Size="Size.Small"
+                                           Color="Color.Error" Title="Devre dışı bırak"
+                                           OnClick="@(() => DeactivateAsync(context))" />
+                        }
+                        else
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" Size="Size.Small"
+                                           Color="Color.Success" Title="Yeniden aktif et"
+                                           OnClick="@(() => ReactivateAsync(context))" />
+                        }
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<StaffDto> _staff = [];
+    private List<SiteDto> _sites = [];
+    private string? _firmSlug;
+    private string? _userId;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _firmSlug = auth.User.FindFirst("firm_slug")?.Value;
+        _userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (_firmSlug is not null)
+        {
+            _staff = await StaffService.GetByFirmAsync(_firmSlug);
+            _sites = await SiteService.GetAllByFirmSlugAsync(_firmSlug);
+        }
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = await DialogService.ShowAsync<StaffFormDialog>("Personel Ekle",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled && _firmSlug is not null)
+            _staff = await StaffService.GetByFirmAsync(_firmSlug);
+    }
+
+    private async Task OpenAccessDialog(StaffDto staff)
+    {
+        var p = new DialogParameters<StaffSiteAccessDialog>
+        {
+            { x => x.Staff, staff },
+            { x => x.AllSites, _sites }
+        };
+        var dialog = await DialogService.ShowAsync<StaffSiteAccessDialog>("Site Erişimi Düzenle", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled && _firmSlug is not null)
+            _staff = await StaffService.GetByFirmAsync(_firmSlug);
+    }
+
+    private async Task DeactivateAsync(StaffDto staff)
+    {
+        await StaffService.DeactivateAsync(staff.Id);
+        Snackbar.Add($"{staff.DisplayName} devre dışı bırakıldı.", Severity.Info);
+        if (_firmSlug is not null) _staff = await StaffService.GetByFirmAsync(_firmSlug);
+    }
+
+    private async Task ReactivateAsync(StaffDto staff)
+    {
+        await StaffService.ReactivateAsync(staff.Id);
+        Snackbar.Add($"{staff.DisplayName} yeniden aktif edildi.", Severity.Success);
+        if (_firmSlug is not null) _staff = await StaffService.GetByFirmAsync(_firmSlug);
+    }
+
+    private static Color RoleColor(StaffRole role) => role switch
+    {
+        StaffRole.SiteAdmin   => Color.Primary,
+        StaffRole.SiteManager => Color.Info,
+        StaffRole.Accountant  => Color.Warning,
+        StaffRole.Auditor     => Color.Secondary,
+        _                     => Color.Default
+    };
+
+    private static string RoleLabel(StaffRole role) => role switch
+    {
+        StaffRole.SiteAdmin   => "Site Yöneticisi",
+        StaffRole.SiteManager => "Site Sorumlusu",
+        StaffRole.Accountant  => "Muhasebeci",
+        StaffRole.Auditor     => "Denetçi",
+        _                     => role.ToString()
+    };
+}

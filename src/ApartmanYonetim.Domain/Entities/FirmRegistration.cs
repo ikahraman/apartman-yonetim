@@ -8,4 +8,8 @@ public class FirmRegistration
     public string DbFilePath { get; set; } = default!;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // SuperAdmin-only alanlar
+    public string? TaxNumber { get; set; }
+    public string? TaxOffice { get; set; }
 }

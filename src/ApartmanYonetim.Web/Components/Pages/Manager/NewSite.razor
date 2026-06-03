@@ -1,0 +1,94 @@
+@page "/firma/site-ekle"
+@attribute [Authorize(Roles = "Manager")]
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+@inject IDialogService DialogService
+
+<PageTitle>Yeni Site Ekle</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/sitelerim"))" />
+        <MudText Typo="Typo.h5" Style="font-weight:700">Yeni Site Ekle</MudText>
+    </MudStack>
+
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+            Eklemek istediğiniz yapı türünü seçin.
+        </MudText>
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="4">
+                <MudCard Elevation="3" Style="cursor:pointer;transition:all .2s"
+                         Class="@(_hover == 0 ? "mud-elevation-8" : "")"
+                         @onmouseenter="@(() => _hover = 0)"
+                         @onmouseleave="@(() => _hover = -1)"
+                         @onclick="OpenApartmanDialog">
+                    <MudCardContent Class="text-center pa-6">
+                        <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Primary"
+                                 Style="font-size:3.5rem" Class="mb-3" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Apartman</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                            Tek bina, giriş — çatı arası daireler
+                        </MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Class="mt-3">Hızlı kurulum</MudChip>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudCard Elevation="3" Style="cursor:pointer;transition:all .2s"
+                         Class="@(_hover == 1 ? "mud-elevation-8" : "")"
+                         @onmouseenter="@(() => _hover = 1)"
+                         @onmouseleave="@(() => _hover = -1)"
+                         @onclick="OpenSiteDialog">
+                    <MudCardContent Class="text-center pa-6">
+                        <MudIcon Icon="@Icons.Material.Filled.LocationCity" Color="Color.Info"
+                                 Style="font-size:3.5rem" Class="mb-3" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Site</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                            Birden fazla blok, ortak alanlı site
+                        </MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Class="mt-3">Çok bloklu</MudChip>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+            <MudItem xs="12" sm="4">
+                <MudCard Elevation="3" Style="cursor:pointer;transition:all .2s"
+                         Class="@(_hover == 2 ? "mud-elevation-8" : "")"
+                         @onmouseenter="@(() => _hover = 2)"
+                         @onmouseleave="@(() => _hover = -1)"
+                         @onclick="@(() => Nav.NavigateTo("/firma/site-ekle/toplu-yapi"))">
+                    <MudCardContent Class="text-center pa-6">
+                        <MudIcon Icon="@Icons.Material.Filled.Domain" Color="Color.Warning"
+                                 Style="font-size:3.5rem" Class="mb-3" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Toplu Yapı</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                            KMK 66-72 kapsamında kısım ve blok yapısı
+                        </MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="mt-3">Çok kısımlı</MudChip>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+</MudContainer>
+
+@code {
+    private int _hover = -1;
+
+    private async Task OpenApartmanDialog()
+    {
+        var opts = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<ApartmanWizardDialog>("Apartman Ekle", opts);
+        var result = await dialog.Result;
+        if (!result!.Canceled) Nav.NavigateTo("/sitelerim");
+    }
+
+    private async Task OpenSiteDialog()
+    {
+        var opts = new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<SiteWizardDialog>("Site Ekle", opts);
+        var result = await dialog.Result;
+        if (!result!.Canceled) Nav.NavigateTo("/sitelerim");
+    }
+}

@@ -1,0 +1,207 @@
+@inject ISiteManagementService SiteService
+@inject IManagementCompanyService CompanyService
+@inject ISiteResidentService ResidentService
+@inject ISiteObligationService ObligationService
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Apartman Ekle</MudText>
+            <MudSpacer />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Adım @(_step + 1) / 3</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <!-- Adım göstergesi -->
+        <MudStack Row="true" Spacing="1" Class="mb-4">
+            @foreach (var (label, i) in new[] { ("Temel Bilgi", 0), ("Bina Yapısı", 1), ("Önizleme", 2) })
+            {
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(i == _step ? Color.Primary : i < _step ? Color.Success : Color.Default)"
+                         Variant="@(i == _step ? Variant.Filled : Variant.Outlined)">
+                    @(i < _step ? "✓ " : "")@label
+                </MudChip>
+                @if (i < 2) { <MudText Color="Color.Secondary">›</MudText> }
+            }
+        </MudStack>
+
+        @if (_step == 0)
+        {
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_name" Label="Apartman Adı" Required="true" Variant="Variant.Outlined"
+                              HelperText="Örn: Lale Apartmanı" />
+                <MudTextField @bind-Value="_slug" Label="Kısa Ad (URL)" Required="true" Variant="Variant.Outlined"
+                              HelperText="Küçük harf, tire ile — örn: lale-apt" />
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudTextField @bind-Value="_city" Label="Şehir" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_fee" Label="Yönetim Ücreti (₺/ay)"
+                                         Variant="Variant.Outlined" Min="0" Format="N0" />
+                    </MudItem>
+                </MudGrid>
+                <MudTextField @bind-Value="_address" Label="Adres" Variant="Variant.Outlined" Lines="2" />
+                <MudGrid Spacing="2">
+                    <MudItem xs="6">
+                        <MudDatePicker @bind-Date="_contractStart" Label="Sözleşme Başlangıç"
+                                       Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudDatePicker @bind-Date="_contractEnd" Label="Sözleşme Bitiş"
+                                       Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true" />
+                    </MudItem>
+                </MudGrid>
+            </MudStack>
+        }
+
+        @if (_step == 1)
+        {
+            <MudStack Spacing="3">
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    Bilgileri girin — daireler <strong>@(_floorCount * _unitsPerFloor) adet</strong> olarak otomatik oluşturulacak.
+                </MudAlert>
+                <MudGrid Spacing="3">
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_floorCount" Label="Kat Sayısı" Min="1" Max="40"
+                                         Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_unitsPerFloor" Label="Kat Başına Daire" Min="1" Max="20"
+                                         Variant="Variant.Outlined" />
+                    </MudItem>
+                </MudGrid>
+                <MudPaper Outlined="true" Class="pa-3">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">Önizleme:</MudText>
+                    <MudStack Row="true" Style="flex-wrap:wrap" Spacing="1">
+                        @for (int i = 1; i <= Math.Min(_floorCount * _unitsPerFloor, 20); i++)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@i</MudChip>
+                        }
+                        @if (_floorCount * _unitsPerFloor > 20)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">... @(_floorCount * _unitsPerFloor) daire</MudText>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudStack>
+        }
+
+        @if (_step == 2)
+        {
+            <MudStack Spacing="2">
+                <MudAlert Severity="Severity.Success" Dense="true">
+                    Hazır! Kaydet butonuna basınca yapı oluşturulacak.
+                </MudAlert>
+                <MudSimpleTable Dense="true" Bordered="true">
+                    <tbody>
+                        <tr><td><strong>Ad</strong></td><td>@_name</td></tr>
+                        <tr><td><strong>Şehir</strong></td><td>@_city</td></tr>
+                        <tr><td><strong>Kat Sayısı</strong></td><td>@_floorCount</td></tr>
+                        <tr><td><strong>Kat Başına Daire</strong></td><td>@_unitsPerFloor</td></tr>
+                        <tr><td><strong>Toplam Daire</strong></td><td><strong>@(_floorCount * _unitsPerFloor)</strong></td></tr>
+                        <tr><td><strong>Numaralandırma</strong></td><td>1, 2, 3... @(_floorCount * _unitsPerFloor)</td></tr>
+                        <tr style="background:rgba(var(--mud-palette-primary-rgb),0.07)">
+                            <td><strong>Aylık Faturalama</strong></td>
+                            <td>
+                                @if (_monthlyFee.HasValue)
+                                {
+                                    <MudText Style="font-weight:700;color:var(--mud-palette-primary)">
+                                        @_monthlyFee.Value.ToString("N0") ₺ / ay
+                                    </MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Sistem tarafından belirlenmektedir</MudText>
+                                }
+                                else { <MudText Color="Color.Secondary">Hesaplanıyor…</MudText> }
+                            </td>
+                        </tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudStack>
+        }
+
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert> }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())" Disabled="_busy">İptal</MudButton>
+        @if (_step > 0)
+        {
+            <MudButton OnClick="Prev" Disabled="_busy">← Geri</MudButton>
+        }
+        @if (_step < 2)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Next" Disabled="_busy">
+                İleri →
+            </MudButton>
+
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SaveAsync" Disabled="_busy">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Oluştur
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private int _step;
+    private string _name = "", _slug = "", _city = "", _address = "";
+    private DateTime? _contractStart = DateTime.Today, _contractEnd;
+    private decimal _fee;
+    private int _floorCount = 4, _unitsPerFloor = 3;
+    private decimal? _monthlyFee;
+    private string? _error;
+    private bool _busy;
+
+    private async Task Next()
+    {
+        _error = null;
+        if (_step == 0 && (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_slug)))
+        { _error = "Ad ve kısa ad zorunludur."; return; }
+        _step++;
+        if (_step == 2)
+            _monthlyFee = await ObligationService.CalculateMonthlyAsync(_floorCount * _unitsPerFloor);
+    }
+
+    private void Prev() { _error = null; _step--; }
+
+    private async Task SaveAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            var companies = await CompanyService.GetForUserAsync(userId);
+            var company = companies.FirstOrDefault() ?? throw new InvalidOperationException("Firma bulunamadı.");
+
+            var cmd = new SiteCommand(company.Id, _name.Trim(), _slug.Trim().ToLower(),
+                _address, _city, _floorCount * _unitsPerFloor,
+                _contractStart.HasValue ? DateOnly.FromDateTime(_contractStart.Value) : null,
+                _contractEnd.HasValue ? DateOnly.FromDateTime(_contractEnd.Value) : null,
+                _fee > 0 ? _fee : null, null, SiteType.Apartman);
+
+            var site = await SiteService.CreateAsync(cmd);
+
+            var configs = new List<BlockGenConfig>
+            {
+                new BlockGenConfig(null, null, null, _floorCount, _unitsPerFloor)
+            };
+            var count = await ResidentService.GenerateUnitsAsync(site.DbFilePath, configs);
+
+            var firmSlug = auth.User.FindFirst("firm_slug")?.Value ?? company.Id.ToString();
+            await ObligationService.CreateObligationAsync(site.Id, site.Name, SiteType.Apartman, firmSlug, count, 0, 0);
+
+            Snackbar.Add($"{site.Name} oluşturuldu — {count} daire eklendi.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(site.Id));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

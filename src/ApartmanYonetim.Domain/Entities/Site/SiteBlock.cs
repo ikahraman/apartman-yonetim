@@ -10,4 +10,5 @@ public class SiteBlock
     public Guid? KisimId { get; set; }
     public SiteKisim? Kisim { get; set; }
     public ICollection<SiteUnit> Units { get; set; } = [];
+    public ICollection<SiteBlockAssignment> Assignments { get; set; } = [];
 }

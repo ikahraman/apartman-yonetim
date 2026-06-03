@@ -1,0 +1,335 @@
+@page "/firma/site-ekle/toplu-yapi"
+@attribute [Authorize(Roles = "Manager")]
+@inject ISiteManagementService SiteService
+@inject IManagementCompanyService CompanyService
+@inject ISiteResidentService ResidentService
+@inject IFirmStaffService StaffService
+@inject ISiteObligationService ObligationService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Toplu Yapı Ekle</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Nav.NavigateTo("/firma/site-ekle"))" />
+        <MudText Typo="Typo.h5" Style="font-weight:700">Toplu Yapı Ekle</MudText>
+    </MudStack>
+
+    <!-- Adım göstergesi -->
+    <MudStack Row="true" Spacing="1" Class="mb-4" Style="flex-wrap:wrap">
+        @foreach (var (label, i) in Steps)
+        {
+            <MudChip T="string" Size="Size.Small"
+                     Color="@(i == _step ? Color.Warning : i < _step ? Color.Success : Color.Default)"
+                     Variant="@(i == _step ? Variant.Filled : Variant.Outlined)">
+                @(i < _step ? "✓ " : $"{i+1}. ")@label
+            </MudChip>
+            @if (i < Steps.Length - 1) { <MudText Color="Color.Secondary">›</MudText> }
+        }
+    </MudStack>
+
+    <MudPaper Elevation="2" Class="pa-4">
+
+        <!-- ADIM 0: TEMEL BİLGİ -->
+        @if (_step == 0)
+        {
+            <MudText Typo="Typo.h6" Class="mb-3">Temel Bilgiler</MudText>
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_name" Label="Toplu Yapı Adı" Required="true" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_slug" Label="Kısa Ad (URL)" Required="true" Variant="Variant.Outlined"
+                              HelperText="Küçük harf, tire ile — örn: prestij-toplu-yapi" />
+                <MudGrid Spacing="2">
+                    <MudItem xs="6"><MudTextField @bind-Value="_city" Label="Şehir" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="6"><MudNumericField @bind-Value="_fee" Label="Yönetim Ücreti (₺/ay)" Variant="Variant.Outlined" Min="0" Format="N0" /></MudItem>
+                </MudGrid>
+                <MudTextField @bind-Value="_address" Label="Adres" Variant="Variant.Outlined" Lines="2" />
+                <MudGrid Spacing="2">
+                    <MudItem xs="6"><MudDatePicker @bind-Date="_contractStart" Label="Sözleşme Başlangıç" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true" /></MudItem>
+                    <MudItem xs="6"><MudDatePicker @bind-Date="_contractEnd" Label="Sözleşme Bitiş" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true" /></MudItem>
+                </MudGrid>
+            </MudStack>
+        }
+
+        <!-- ADIM 1: KISIM TANIMLARI -->
+        @if (_step == 1)
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudText Typo="Typo.h6">Kısım Tanımları</MudText>
+                <MudSpacer />
+                <MudButton Variant="Variant.Outlined" Color="Color.Warning" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="AddKisim">Kısım Ekle</MudButton>
+            </MudStack>
+            @if (_kisimlar.Count == 0)
+            {
+                <MudAlert Severity="Severity.Warning">En az bir kısım ekleyin (örn: 1.Kısım, 2.Kısım).</MudAlert>
+            }
+            else
+            {
+                <MudStack Spacing="2">
+                    @foreach (var k in _kisimlar)
+                    {
+                        var kc = k;
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudTextField @bind-Value="kc.Code" Label="Kod" Variant="Variant.Outlined"
+                                          Style="width:100px" Margin="Margin.Dense" />
+                            <MudTextField @bind-Value="kc.Name" Label="Kısım Adı" Variant="Variant.Outlined"
+                                          Style="flex:1" Margin="Margin.Dense" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                           Size="Size.Small" OnClick="@(() => _kisimlar.Remove(kc))" />
+                        </MudStack>
+                    }
+                </MudStack>
+            }
+        }
+
+        <!-- ADIM 2: BLOK TANIMLARI -->
+        @if (_step == 2)
+        {
+            <MudText Typo="Typo.h6" Class="mb-3">Blok Tanımları</MudText>
+            @foreach (var k in _kisimlar)
+            {
+                var kc = k;
+                <MudExpansionPanel Text="@($"{kc.Name} — {kc.Blocks.Count} blok, {kc.Blocks.Sum(b => b.FloorCount * b.UnitsPerFloor)} daire")"
+                                   IsInitiallyExpanded="true" Class="mb-2">
+                    <MudStack Spacing="2" Class="pa-2">
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="@(() => AddBlock(kc))">Blok Ekle</MudButton>
+
+                        @if (kc.Blocks.Count > 0)
+                        {
+                            <MudTable Items="kc.Blocks" Dense="true" Elevation="0" Outlined="true">
+                                <HeaderContent>
+                                    <MudTh>Kod</MudTh><MudTh>Ad</MudTh><MudTh>Kat</MudTh><MudTh>Daire/Kat</MudTh><MudTh>Toplam</MudTh><MudTh></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd Style="width:80px"><MudTextField @bind-Value="context.Code" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                                    <MudTd><MudTextField @bind-Value="context.Name" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                                    <MudTd Style="width:90px"><MudNumericField @bind-Value="context.FloorCount" Min="1" Max="40" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                                    <MudTd Style="width:100px"><MudNumericField @bind-Value="context.UnitsPerFloor" Min="1" Max="20" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd>
+                                    <MudTd><MudText Style="font-weight:600">@(context.FloorCount * context.UnitsPerFloor)</MudText></MudTd>
+                                    <MudTd><MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => kc.Blocks.Remove(context))" /></MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    </MudStack>
+                </MudExpansionPanel>
+            }
+        }
+
+        <!-- ADIM 3: YETKİLİ ATAMALARI -->
+        @if (_step == 3)
+        {
+            <MudText Typo="Typo.h6" Class="mb-3">Blok Yetkilileri (İsteğe Bağlı)</MudText>
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                Her blok için yetkili manager atayabilirsiniz. Sonradan da değiştirilebilir.
+            </MudAlert>
+            @foreach (var k in _kisimlar)
+            {
+                <MudText Typo="Typo.subtitle2" Color="Color.Secondary" Class="mb-1 mt-2">@k.Name</MudText>
+                @foreach (var b in k.Blocks)
+                {
+                    var bc = b;
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-1">
+                        <MudText Style="min-width:120px;font-weight:600">@bc.Name</MudText>
+                        <MudSelect T="string" @bind-Value="bc.ManagerUserId" Label="Yetkili"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1" Clearable="true">
+                            @foreach (var m in _managers)
+                            {
+                                <MudSelectItem Value="@m.Id">@m.DisplayName (@m.Email)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudStack>
+                }
+            }
+        }
+
+        <!-- ADIM 4: ÖNİZLEME -->
+        @if (_step == 4)
+        {
+            var totalUnits = _kisimlar.SelectMany(k => k.Blocks).Sum(b => b.FloorCount * b.UnitsPerFloor);
+            <MudAlert Severity="Severity.Success" Class="mb-3">
+                <strong>@_name</strong> — @_kisimlar.Count kısım, @_kisimlar.SelectMany(k => k.Blocks).Count() blok, <strong>@totalUnits daire</strong> oluşturulacak.
+            </MudAlert>
+            @foreach (var k in _kisimlar)
+            {
+                <MudPaper Outlined="true" Class="pa-3 mb-2">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:700">@k.Name</MudText>
+                    @foreach (var b in k.Blocks)
+                    {
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Class="mt-1" Spacing="2">
+                            <MudText Style="min-width:100px">@b.Name</MudText>
+                            <MudStack Row="true" Style="flex-wrap:wrap" Spacing="0">
+                                @for (int i = 1; i <= Math.Min(b.FloorCount * b.UnitsPerFloor, 8); i++)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">@($"{b.Code}-{i}")</MudChip>
+                                }
+                                @if (b.FloorCount * b.UnitsPerFloor > 8)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">... @(b.FloorCount * b.UnitsPerFloor) daire</MudText>
+                                }
+                            </MudStack>
+                            @if (b.ManagerUserId is not null)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                                    @(_managers.FirstOrDefault(m => m.Id == b.ManagerUserId)?.DisplayName)
+                                </MudChip>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            }
+        }
+
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert> }
+    </MudPaper>
+
+    <!-- NAVİGASYON BUTONLARI -->
+    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-4">
+        <MudButton Variant="Variant.Text" OnClick="@(() => Nav.NavigateTo("/firma/site-ekle"))" Disabled="_busy">
+            İptal
+        </MudButton>
+        <MudStack Row="true" Spacing="2">
+            @if (_step > 0)
+            {
+                <MudButton Variant="Variant.Outlined" OnClick="Prev" Disabled="_busy">← Geri</MudButton>
+            }
+            @if (_step < Steps.Length - 1)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Warning" OnClick="Next" Disabled="_busy">
+                    İleri →
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SaveAsync" Disabled="_busy">
+                    @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                    Oluştur
+                </MudButton>
+            }
+        </MudStack>
+    </MudStack>
+</MudContainer>
+
+@code {
+    private static readonly (string label, int i)[] Steps =
+        [("Temel Bilgi", 0), ("Kısımlar", 1), ("Bloklar", 2), ("Yetkililer", 3), ("Önizleme", 4)];
+
+    private int _step;
+    private string _name = "", _slug = "", _city = "", _address = "";
+    private DateTime? _contractStart = DateTime.Today, _contractEnd;
+    private decimal _fee;
+    private List<WizardKisim> _kisimlar = [];
+    private List<ManagerLookupDto> _managers = [];
+    private string? _error;
+    private bool _busy;
+
+    private class WizardKisim
+    {
+        public Guid TempId { get; } = Guid.NewGuid();
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public List<WizardBlock> Blocks { get; set; } = [];
+    }
+
+    private class WizardBlock
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public int FloorCount { get; set; } = 6;
+        public int UnitsPerFloor { get; set; } = 4;
+        public string? ManagerUserId { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var firmSlug = auth.User.FindFirst("firm_slug")?.Value ?? "";
+        _managers = await StaffService.GetManagersByFirmAsync(firmSlug);
+        AddKisim();
+    }
+
+    private void AddKisim()
+    {
+        var num = _kisimlar.Count + 1;
+        _kisimlar.Add(new WizardKisim { Code = $"{num}", Name = $"{num}.Kısım" });
+    }
+
+    private void AddBlock(WizardKisim k)
+    {
+        var count = k.Blocks.Count;
+        var code = k.Code + (char)('A' + count);
+        k.Blocks.Add(new WizardBlock { Code = code, Name = $"{code} Blok" });
+    }
+
+    private void Next()
+    {
+        _error = null;
+        if (_step == 0 && (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_slug)))
+        { _error = "Ad ve kısa ad zorunludur."; return; }
+        if (_step == 1 && _kisimlar.Count == 0)
+        { _error = "En az bir kısım ekleyin."; return; }
+        if (_step == 2 && _kisimlar.Any(k => k.Blocks.Count == 0))
+        { _error = "Her kısımda en az bir blok olmalıdır."; return; }
+        _step++;
+    }
+
+    private void Prev() { _error = null; _step--; }
+
+    private async Task SaveAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            var companies = await CompanyService.GetForUserAsync(userId);
+            var company = companies.FirstOrDefault() ?? throw new InvalidOperationException("Firma bulunamadı.");
+
+            var totalUnits = _kisimlar.SelectMany(k => k.Blocks).Sum(b => b.FloorCount * b.UnitsPerFloor);
+            var cmd = new SiteCommand(company.Id, _name.Trim(), _slug.Trim().ToLower(),
+                _address, _city, totalUnits,
+                _contractStart.HasValue ? DateOnly.FromDateTime(_contractStart.Value) : null,
+                _contractEnd.HasValue ? DateOnly.FromDateTime(_contractEnd.Value) : null,
+                _fee > 0 ? _fee : null, null, SiteType.TopluYapi);
+
+            var site = await SiteService.CreateAsync(cmd);
+
+            var genConfigs = new List<BlockGenConfig>();
+            foreach (var k in _kisimlar)
+            {
+                var kisimDto = await ResidentService.AddKisimAsync(site.DbFilePath,
+                    new SiteKisimCommand(k.Name, k.Code, null));
+
+                foreach (var b in k.Blocks)
+                {
+                    var blokDto = await ResidentService.AddBlockAsync(site.DbFilePath,
+                        new SiteBlockCommand(b.Name, b.Code, b.FloorCount,
+                            b.FloorCount * b.UnitsPerFloor, kisimDto.Id));
+                    genConfigs.Add(new BlockGenConfig(b.Code, b.Name, blokDto.Id, b.FloorCount, b.UnitsPerFloor));
+
+                    if (b.ManagerUserId is not null)
+                    {
+                        var managerName = _managers.FirstOrDefault(m => m.Id == b.ManagerUserId)?.DisplayName ?? "";
+                        await ResidentService.AddBlockAssignmentAsync(site.DbFilePath, blokDto.Id,
+                            new BlockAssignmentCommand(b.ManagerUserId, managerName,
+                                DateOnly.FromDateTime(DateTime.Today)));
+                    }
+                }
+            }
+
+            var count = await ResidentService.GenerateUnitsAsync(site.DbFilePath, genConfigs);
+
+            var firmSlugOb = auth.User.FindFirst("firm_slug")?.Value ?? company.Id.ToString();
+            var totalBloks = _kisimlar.Sum(k => k.Blocks.Count);
+            await ObligationService.CreateObligationAsync(site.Id, site.Name, SiteType.TopluYapi, firmSlugOb, count, totalBloks, _kisimlar.Count);
+
+            Snackbar.Add($"{site.Name} oluşturuldu — {count} daire eklendi.", Severity.Success);
+            Nav.NavigateTo($"/site/{site.Id}/sakinler");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

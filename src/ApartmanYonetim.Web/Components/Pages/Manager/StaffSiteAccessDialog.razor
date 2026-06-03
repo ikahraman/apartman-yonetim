@@ -1,0 +1,57 @@
+@using ApartmanYonetim.Domain.Enums
+@inject IFirmStaffService StaffService
+@inject AuthenticationStateProvider AuthProvider
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-3">
+            <strong>@Staff.DisplayName</strong> için erişim verilecek siteleri seçin.
+            Hiçbiri seçilmezse tüm sitelere erişim olur.
+        </MudText>
+        <MudStack Spacing="1">
+            @foreach (var site in AllSites)
+            {
+                var s = site;
+                <MudCheckBox @bind-Value="@_selected[s.Id]" Label="@s.Name" Color="Color.Primary" />
+            }
+        </MudStack>
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Class="mt-2">@_error</MudAlert> }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public StaffDto Staff { get; set; } = default!;
+    [Parameter] public List<SiteDto> AllSites { get; set; } = [];
+
+    private Dictionary<Guid, bool> _selected = new();
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        _selected = AllSites.ToDictionary(s => s.Id, s => Staff.SiteNames.Contains(s.Name));
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            var siteIds = _selected.Where(kv => kv.Value).Select(kv => kv.Key).ToList();
+            await StaffService.UpdateSiteAccessAsync(Staff.Id, siteIds, userId);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

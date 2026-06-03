@@ -1,0 +1,98 @@
+@inject IFirmSubscriptionService SubService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudStack Row="true" Spacing="2">
+                <MudNumericField @bind-Value="_year" Label="Yıl" Min="2020" Max="2099"
+                                 Variant="Variant.Outlined" Style="flex:1" />
+                <MudSelect T="int" @bind-Value="_month" Label="Ay" Variant="Variant.Outlined" Style="flex:1">
+                    @foreach (var (name, num) in _months)
+                    {
+                        <MudSelectItem Value="num">@name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudStack>
+            <MudNumericField @bind-Value="_amountDue" Label="Borç Tutarı (₺)" Min="0"
+                             Variant="Variant.Outlined" />
+            <MudNumericField @bind-Value="_amountPaid" Label="Ödenen Tutar (₺)" Min="0"
+                             Variant="Variant.Outlined" />
+            <MudDatePicker @bind-Date="_dueDate" Label="Son Ödeme Tarihi"
+                           Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+            <MudDatePicker @bind-Date="_paymentDate" Label="Ödeme Tarihi (opsiyonel)"
+                           Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Clearable="true" />
+            <MudSelect T="PaymentRecordStatus" @bind-Value="_status" Label="Durum" Variant="Variant.Outlined">
+                <MudSelectItem Value="PaymentRecordStatus.Pending">Bekliyor</MudSelectItem>
+                <MudSelectItem Value="PaymentRecordStatus.Paid">Ödendi</MudSelectItem>
+                <MudSelectItem Value="PaymentRecordStatus.Partial">Kısmi</MudSelectItem>
+                <MudSelectItem Value="PaymentRecordStatus.Overdue">Gecikmiş</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_notes" Label="Not (opsiyonel)" Variant="Variant.Outlined" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string FirmSlug { get; set; } = default!;
+    [Parameter] public PaymentRecordDto? Record { get; set; }
+    [Parameter] public decimal DefaultAmount { get; set; }
+
+    private int _year = DateTime.Now.Year;
+    private int _month = DateTime.Now.Month;
+    private decimal _amountDue;
+    private decimal _amountPaid;
+    private DateTime? _dueDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 5);
+    private DateTime? _paymentDate;
+    private PaymentRecordStatus _status = PaymentRecordStatus.Pending;
+    private string? _notes;
+    private string? _error;
+    private bool _busy;
+
+    private static readonly (string name, int num)[] _months =
+    [
+        ("Ocak",1),("Şubat",2),("Mart",3),("Nisan",4),("Mayıs",5),("Haziran",6),
+        ("Temmuz",7),("Ağustos",8),("Eylül",9),("Ekim",10),("Kasım",11),("Aralık",12)
+    ];
+
+    protected override void OnParametersSet()
+    {
+        if (Record is not null)
+        {
+            _year = Record.PeriodYear; _month = Record.PeriodMonth;
+            _amountDue = Record.AmountDue; _amountPaid = Record.AmountPaid;
+            _dueDate = Record.DueDate.ToDateTime(TimeOnly.MinValue);
+            _paymentDate = Record.PaymentDate?.ToDateTime(TimeOnly.MinValue);
+            _status = Record.PaymentStatus; _notes = Record.Notes;
+        }
+        else
+        {
+            _amountDue = DefaultAmount;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var cmd = new PaymentRecordCommand(
+                FirmSlug, _year, _month, _amountDue, _amountPaid,
+                DateOnly.FromDateTime(_dueDate ?? DateTime.Today),
+                _paymentDate.HasValue ? DateOnly.FromDateTime(_paymentDate.Value) : null,
+                _status, _notes);
+            await SubService.UpsertPaymentRecordAsync(cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

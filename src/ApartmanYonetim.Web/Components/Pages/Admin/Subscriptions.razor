@@ -1,0 +1,257 @@
+@page "/admin/abonelikler"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IFirmSubscriptionService SubService
+@inject IFirmRegistrationService FirmService
+@inject NavigationManager Nav
+
+<PageTitle>Firma Abonelikleri</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h5" Style="font-weight:700">Firma Abonelikleri</MudText>
+        <MudSpacer />
+        <MudSelect T="string" @bind-Value="_filterStatus" Label="Filtre" Variant="Variant.Outlined"
+                   Dense="true" Style="width:160px" Clearable="true">
+            <MudSelectItem Value="@("Active")">Aktif</MudSelectItem>
+            <MudSelectItem Value="@("Trial")">Deneme</MudSelectItem>
+            <MudSelectItem Value="@("Overdue")">Gecikmiş</MudSelectItem>
+            <MudSelectItem Value="@("Suspended")">Askıya Alındı</MudSelectItem>
+        </MudSelect>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <!-- Dikkat Paneli -->
+        @if (_overduePaymentFirms.Count > 0 || _overdueSubFirms.Count > 0)
+        {
+            <MudPaper Elevation="0" Class="mb-4 pa-3"
+                      Style="border:2px solid var(--mud-palette-error);border-radius:8px;background:rgba(var(--mud-palette-error-rgb),0.05)">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-2" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:700;color:var(--mud-palette-error)">
+                        Dikkat Gerektiren Durumlar
+                    </MudText>
+                </MudStack>
+                <MudStack Spacing="1">
+                    @foreach (var firm in _overdueSubFirms)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true"
+                                  Style="cursor:pointer" OnClick="@(() => Nav.NavigateTo($"/admin/abonelikler/{firm}"))">
+                            <strong>@_firmNames.GetValueOrDefault(firm, firm)</strong> — Abonelik ödemesi gecikmiş!
+                            Tahsilat yapılmadığında sistem erişimi kesilebilir.
+                        </MudAlert>
+                    }
+                    @foreach (var firm in _overduePaymentFirms.Except(_overdueSubFirms))
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true"
+                                  Style="cursor:pointer" OnClick="@(() => Nav.NavigateTo($"/admin/abonelikler/{firm}"))">
+                            <strong>@_firmNames.GetValueOrDefault(firm, firm)</strong> — Bu ay ödeme kaydı gecikmiş.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudPaper>
+        }
+
+        var filtered = string.IsNullOrEmpty(_filterStatus)
+            ? _subs
+            : _subs.Where(s => s.Status.ToString() == _filterStatus).ToList();
+
+        @if (filtered.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">Kayıt bulunamadı.</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="filtered" Hover="true" Elevation="2"
+                      RowStyleFunc="@RowStyle">
+                <HeaderContent>
+                    <MudTh></MudTh>
+                    <MudTh>Firma</MudTh>
+                    <MudTh>Paket</MudTh>
+                    <MudTh>Aktif Site</MudTh>
+                    <MudTh>Aylık Ücret</MudTh>
+                    <MudTh>Sözleşme Bitiş</MudTh>
+                    <MudTh>Bu Ay Ödeme</MudTh>
+                    <MudTh>Durum</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    @{
+                        var rec = _payments.GetValueOrDefault(context.FirmSlug);
+                        var payOverdue = rec?.PaymentStatus == PaymentRecordStatus.Overdue;
+                        var subOverdue = context.Status == SubscriptionStatus.Overdue || context.Status == SubscriptionStatus.Suspended;
+                    }
+                    <MudTd Style="width:28px;padding-right:0">
+                        @if (payOverdue || subOverdue)
+                        {
+                            <MudTooltip Text="@AlertTooltip(payOverdue, subOverdue)">
+                                <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                            </MudTooltip>
+                        }
+                    </MudTd>
+                    <MudTd><MudText Style="font-weight:600">@context.FirmName</MudText></MudTd>
+                    <MudTd>@context.PackageName</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">
+                            @context.ActiveSiteCount @(context.MaxSiteCount.HasValue ? $"/ {context.MaxSiteCount}" : "")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        @if (context.CustomMonthlyPrice.HasValue)
+                        {
+                            <MudStack Spacing="0">
+                                <MudText Style="font-weight:600">@context.EffectiveMonthlyPrice.ToString("N0") ₺</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Warning">Özel Fiyat</MudText>
+                            </MudStack>
+                        }
+                        else
+                        {
+                            <MudText>@context.EffectiveMonthlyPrice.ToString("N0") ₺</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        @if (context.ContractEndDate.HasValue)
+                        {
+                            var daysLeft = (context.ContractEndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days;
+                            <MudText Color="@(daysLeft < 0 ? Color.Error : daysLeft <= 30 ? Color.Warning : Color.Default)">
+                                @context.ContractEndDate.Value.ToString("dd.MM.yyyy")
+                                @if (daysLeft < 0) { <text> ⚠</text> }
+                            </MudText>
+                        }
+                        else { <MudText Color="Color.Secondary">Belirsiz</MudText> }
+                    </MudTd>
+                    <MudTd>
+                        @if (rec is null)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">—</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@PaymentColor(rec.PaymentStatus)" Variant="Variant.Filled">
+                                @PaymentLabel(rec.PaymentStatus)
+                            </MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@StatusColor(context.Status)" Variant="Variant.Filled">
+                            @StatusLabel(context.Status)
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
+                                       Color="Color.Primary"
+                                       OnClick="@(() => Nav.NavigateTo($"/admin/abonelikler/{context.FirmSlug}"))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+
+        <MudStack Row="true" Justify="Justify.FlexEnd" Class="mt-4" Spacing="3">
+            <MudPaper Outlined="true" Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Aylık Gelir</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight:700">
+                    @_subs.Sum(s => s.EffectiveMonthlyPrice).ToString("N0") ₺
+                </MudText>
+            </MudPaper>
+            <MudPaper Outlined="true" Class="pa-3">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Gecikmiş / Askıda</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight:700;color:var(--mud-palette-error)">
+                    @_subs.Count(s => s.Status is SubscriptionStatus.Overdue or SubscriptionStatus.Suspended)
+                </MudText>
+            </MudPaper>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    private List<SubscriptionDto> _subs = [];
+    private Dictionary<string, PaymentRecordDto> _payments = new();
+    private Dictionary<string, string> _firmNames = new();
+    private HashSet<string> _overduePaymentFirms = [];
+    private HashSet<string> _overdueSubFirms = [];
+    private string? _filterStatus;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _subs = await SubService.GetAllSubscriptionsAsync();
+        foreach (var s in _subs)
+            _firmNames[s.FirmSlug] = s.FirmName;
+
+        var now = DateTime.Now;
+        foreach (var s in _subs)
+        {
+            var recs = await SubService.GetPaymentRecordsAsync(s.FirmSlug);
+            var thisMonth = recs.FirstOrDefault(r => r.PeriodYear == now.Year && r.PeriodMonth == now.Month);
+            if (thisMonth is not null) _payments[s.FirmSlug] = thisMonth;
+
+            if (thisMonth?.PaymentStatus == PaymentRecordStatus.Overdue)
+                _overduePaymentFirms.Add(s.FirmSlug);
+
+            if (s.Status is SubscriptionStatus.Overdue or SubscriptionStatus.Suspended)
+                _overdueSubFirms.Add(s.FirmSlug);
+        }
+        _loading = false;
+    }
+
+    private string RowStyle(SubscriptionDto s, int _)
+    {
+        var rec = _payments.GetValueOrDefault(s.FirmSlug);
+        var payOverdue = rec?.PaymentStatus == PaymentRecordStatus.Overdue;
+        var subOverdue = s.Status is SubscriptionStatus.Overdue or SubscriptionStatus.Suspended;
+        if (payOverdue || subOverdue)
+            return "background:rgba(var(--mud-palette-error-rgb),0.07);border-left:3px solid var(--mud-palette-error)";
+        return "";
+    }
+
+    private static string AlertTooltip(bool payOverdue, bool subOverdue)
+    {
+        var parts = new List<string>();
+        if (subOverdue) parts.Add("Abonelik gecikmiş");
+        if (payOverdue) parts.Add("Ödeme gecikmiş");
+        return string.Join(" · ", parts);
+    }
+
+    private static Color StatusColor(SubscriptionStatus s) => s switch
+    {
+        SubscriptionStatus.Active    => Color.Success,
+        SubscriptionStatus.Trial     => Color.Info,
+        SubscriptionStatus.Overdue   => Color.Error,
+        SubscriptionStatus.Suspended => Color.Warning,
+        SubscriptionStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+
+    private static string StatusLabel(SubscriptionStatus s) => s switch
+    {
+        SubscriptionStatus.Active    => "Aktif",
+        SubscriptionStatus.Trial     => "Deneme",
+        SubscriptionStatus.Overdue   => "Gecikmiş",
+        SubscriptionStatus.Suspended => "Askıda",
+        SubscriptionStatus.Cancelled => "İptal",
+        _ => s.ToString()
+    };
+
+    private static Color PaymentColor(PaymentRecordStatus s) => s switch
+    {
+        PaymentRecordStatus.Paid    => Color.Success,
+        PaymentRecordStatus.Partial => Color.Warning,
+        PaymentRecordStatus.Overdue => Color.Error,
+        _                           => Color.Default
+    };
+
+    private static string PaymentLabel(PaymentRecordStatus s) => s switch
+    {
+        PaymentRecordStatus.Paid    => "Ödendi",
+        PaymentRecordStatus.Partial => "Kısmi",
+        PaymentRecordStatus.Overdue => "Gecikmiş",
+        PaymentRecordStatus.Pending => "Bekliyor",
+        _ => s.ToString()
+    };
+}

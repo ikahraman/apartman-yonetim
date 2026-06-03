@@ -10,21 +10,28 @@ public class SiteFeeService(SiteDbContextFactory factory) : ISiteFeeService
     private static readonly string[] Months = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
     private static string PeriodLabel(int year, int month) => $"{Months[month - 1]} {year}";
 
+    private static FeeScheduleDto ToDto(SiteFeeSchedule s, string? daireTypeName = null) =>
+        new(s.Id, s.Name, s.Amount, s.Period, s.DueDay, s.StartDate, s.EndDate, s.IsActive,
+            s.DistributionType, s.AppliesToUnitType, s.AppliesToDaireTypeId, daireTypeName);
+
     public async Task<List<FeeScheduleDto>> GetSchedulesAsync(string dbFilePath)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
-        return await db.FeeSchedules.OrderByDescending(s => s.IsActive).ThenBy(s => s.Name)
-            .Select(s => new FeeScheduleDto(s.Id, s.Name, s.Amount, s.Period, s.DueDay, s.StartDate, s.EndDate, s.IsActive, s.DistributionType, s.AppliesToUnitType))
-            .ToListAsync();
+        var schedules = await db.FeeSchedules.OrderByDescending(s => s.IsActive).ThenBy(s => s.Name).ToListAsync();
+        var typeIds = schedules.Where(s => s.AppliesToDaireTypeId.HasValue).Select(s => s.AppliesToDaireTypeId!.Value).Distinct().ToList();
+        var typeNames = typeIds.Count > 0
+            ? await db.DaireTypes.Where(d => typeIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.Name)
+            : new Dictionary<Guid, string>();
+        return schedules.Select(s => ToDto(s, s.AppliesToDaireTypeId.HasValue && typeNames.TryGetValue(s.AppliesToDaireTypeId.Value, out var n) ? n : null)).ToList();
     }
 
     public async Task<FeeScheduleDto> AddScheduleAsync(string dbFilePath, FeeScheduleCommand cmd)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
-        var s = new SiteFeeSchedule { Name = cmd.Name, Amount = cmd.Amount, Period = cmd.Period, DueDay = cmd.DueDay, StartDate = cmd.StartDate, EndDate = cmd.EndDate, DistributionType = cmd.DistributionType, AppliesToUnitType = cmd.AppliesToUnitType };
+        var s = new SiteFeeSchedule { Name = cmd.Name, Amount = cmd.Amount, Period = cmd.Period, DueDay = cmd.DueDay, StartDate = cmd.StartDate, EndDate = cmd.EndDate, DistributionType = cmd.DistributionType, AppliesToUnitType = cmd.AppliesToUnitType, AppliesToDaireTypeId = cmd.AppliesToDaireTypeId };
         db.FeeSchedules.Add(s);
         await db.SaveChangesAsync();
-        return new FeeScheduleDto(s.Id, s.Name, s.Amount, s.Period, s.DueDay, s.StartDate, s.EndDate, s.IsActive, s.DistributionType, s.AppliesToUnitType);
+        return ToDto(s);
     }
 
     public async Task UpdateScheduleAsync(string dbFilePath, Guid scheduleId, FeeScheduleCommand cmd)
@@ -34,6 +41,7 @@ public class SiteFeeService(SiteDbContextFactory factory) : ISiteFeeService
         s.Name = cmd.Name; s.Amount = cmd.Amount; s.Period = cmd.Period;
         s.DueDay = cmd.DueDay; s.StartDate = cmd.StartDate; s.EndDate = cmd.EndDate;
         s.DistributionType = cmd.DistributionType; s.AppliesToUnitType = cmd.AppliesToUnitType;
+        s.AppliesToDaireTypeId = cmd.AppliesToDaireTypeId;
         await db.SaveChangesAsync();
     }
 
@@ -77,7 +85,12 @@ public class SiteFeeService(SiteDbContextFactory factory) : ISiteFeeService
         var label = PeriodLabel(year, month);
         if (await db.FeePayments.AnyAsync(p => p.ScheduleId == scheduleId && p.PeriodLabel == label))
             throw new InvalidOperationException($"'{label}' için kayıt zaten mevcut.");
-        var units = await db.Units.ToListAsync();
+        var unitsQuery = db.Units.AsQueryable();
+        if (schedule.AppliesToUnitType.HasValue)
+            unitsQuery = unitsQuery.Where(u => u.UnitType == schedule.AppliesToUnitType.Value);
+        if (schedule.AppliesToDaireTypeId.HasValue)
+            unitsQuery = unitsQuery.Where(u => u.DaireTypeId == schedule.AppliesToDaireTypeId.Value);
+        var units = await unitsQuery.ToListAsync();
         var dueDate = new DateOnly(year, month, Math.Min(schedule.DueDay, DateTime.DaysInMonth(year, month)));
         db.FeePayments.AddRange(units.Select(u => new SiteFeePayment
         {

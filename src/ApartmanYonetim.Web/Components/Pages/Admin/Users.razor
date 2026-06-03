@@ -42,7 +42,7 @@
                 <MudTd>
                     <MudStack Row="true" Spacing="0">
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditDialog(context))" />
-                        @if (context.Roles.Contains("SiteStaff") || context.Roles.Contains("Auditor"))
+                        @if (context.Roles.Contains("SiteStaff") || context.Roles.Contains("Auditor") || context.Roles.Contains("Accountant"))
                         {
                             <MudTooltip Text="Site Erişimi">
                                 <MudIconButton Icon="@Icons.Material.Filled.AssignmentInd" Size="Size.Small" Color="Color.Secondary" OnClick="@(() => OpenSiteAssignmentDialog(context))" />

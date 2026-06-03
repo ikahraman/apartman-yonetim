@@ -1,0 +1,71 @@
+@inject IFirmSubscriptionService SubService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_name" Label="Paket Adı" Required="true"
+                          Variant="Variant.Outlined" HelperText="Örn: Solo, Küçük, Orta" />
+            <MudStack Row="true" Spacing="2">
+                <MudNumericField @bind-Value="_minSite" Label="Min Site" Min="1"
+                                 Variant="Variant.Outlined" Style="flex:1" />
+                <MudNumericField @bind-Value="_maxSite" Label="Max Site (boş = sınırsız)"
+                                 Variant="Variant.Outlined" Style="flex:1" Clearable="true" />
+            </MudStack>
+            <MudNumericField @bind-Value="_price" Label="Aylık Ücret (₺)"
+                             Variant="Variant.Outlined" Min="0"
+                             HelperText="Enterprise için 0 girin (özel fiyat gösterilir)" />
+            <MudNumericField @bind-Value="_order" Label="Sıralama" Min="1"
+                             Variant="Variant.Outlined" />
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public PackageDto? Package { get; set; }
+
+    private string _name = "";
+    private int _minSite = 1;
+    private int? _maxSite;
+    private decimal _price;
+    private int _order = 1;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Package is not null)
+        {
+            _name = Package.Name; _minSite = Package.MinSiteCount;
+            _maxSite = Package.MaxSiteCount; _price = Package.MonthlyPrice;
+            _order = Package.DisplayOrder;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) { _error = "Paket adı zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var cmd = new PackageCommand(_name.Trim(), _minSite, _maxSite, _price, _order);
+            if (Package is null) await SubService.CreatePackageAsync(cmd);
+            else await SubService.UpdatePackageAsync(Package.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

@@ -16,13 +16,24 @@ public class TenantContext : ITenantContext
         get
         {
             if (_overrideSlug is not null) return _overrideSlug;
-            // Works for HTTP requests and for Blazor Server during the initial handshake
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("firm_slug");
             return claim?.Value;
         }
     }
 
     public bool HasFirm => FirmSlug is not null;
+
+    public string? UserRole
+    {
+        get
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user is null) return null;
+            foreach (var role in new[] { "SuperAdmin", "Manager", "SiteStaff", "Auditor", "Accountant", "Resident" })
+                if (user.IsInRole(role)) return role;
+            return null;
+        }
+    }
 
     public void SetFirmSlug(string slug) => _overrideSlug = slug;
 }

@@ -1,0 +1,171 @@
+@page "/firma/sozlesmeler"
+@attribute [Authorize(Roles = "Manager")]
+@using ApartmanYonetim.Domain.Enums
+@inject IFirmContractService ContractService
+@inject ISiteManagementService SiteService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Sözleşme Yönetimi</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h5" Style="font-weight:700">Sözleşme Yönetimi</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">Yeni Sözleşme</MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_contracts.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Henüz sözleşme bulunmuyor.</MudAlert>
+    }
+    else
+    {
+        <MudTable T="ContractDto" Items="_contracts" Hover="true" Elevation="2" Dense="true"
+                  GroupBy="@_groupDef" GroupHeaderStyle="background:var(--mud-palette-background-grey)">
+            <HeaderContent>
+                <MudTh>Site</MudTh>
+                <MudTh>Sözleşme No</MudTh>
+                <MudTh>Başlangıç</MudTh>
+                <MudTh>Bitiş</MudTh>
+                <MudTh>Durum</MudTh>
+                <MudTh>Aylık Ücret</MudTh>
+                <MudTh>Kapsam</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <GroupHeaderTemplate>
+                <MudTh colspan="8">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIcon Icon="@Icons.Material.Filled.Apartment" Size="Size.Small" Color="Color.Primary" />
+                        <strong>@context.Key</strong>
+                    </MudStack>
+                </MudTh>
+            </GroupHeaderTemplate>
+            <RowTemplate>
+                <MudTd>@context.SiteName</MudTd>
+                <MudTd>@(context.ContractNumber ?? "—")</MudTd>
+                <MudTd>@context.StartDate.ToString("dd.MM.yyyy")</MudTd>
+                <MudTd>
+                    @if (context.EndDate.HasValue)
+                    {
+                        var daysLeft = (context.EndDate.Value.ToDateTime(TimeOnly.MinValue) - DateTime.Today).Days;
+                        <MudText Color="@(daysLeft < 0 ? Color.Error : daysLeft < 60 ? Color.Warning : Color.Default)"
+                                 Typo="Typo.body2">
+                            @context.EndDate.Value.ToString("dd.MM.yyyy")
+                            @if (daysLeft < 0) { <text> ⚠ Doldu</text> }
+                            else if (daysLeft < 60) { <text> (@daysLeft gün)</text> }
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Belirsiz Süreli</MudText>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small" Color="@StatusColor(context.Status)">
+                        @StatusLabel(context.Status)
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.MonthlyFee.ToString("N0") ₺</MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="0">
+                        @if (context.Scope.HasFlag(ContractScope.Aidat))    { <MudChip T="string" Size="Size.Small" Color="Color.Default">Aidat</MudChip> }
+                        @if (context.Scope.HasFlag(ContractScope.Muhasebe)) { <MudChip T="string" Size="Size.Small" Color="Color.Default">Muhasebe</MudChip> }
+                        @if (context.Scope.HasFlag(ContractScope.Ariza))    { <MudChip T="string" Size="Size.Small" Color="Color.Default">Arıza</MudChip> }
+                        @if (context.Scope.HasFlag(ContractScope.Toplanti)) { <MudChip T="string" Size="Size.Small" Color="Color.Default">Toplantı</MudChip> }
+                        @if (context.Scope.HasFlag(ContractScope.Duyuru))   { <MudChip T="string" Size="Size.Small" Color="Color.Default">Duyuru</MudChip> }
+                    </MudStack>
+                </MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="0">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                       OnClick="@(() => OpenEditDialog(context))" />
+                        @if (context.Status == ContractStatus.Active)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error"
+                                           Title="Sözleşmeyi feshet"
+                                           OnClick="@(() => TerminateAsync(context))" />
+                        }
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<ContractDto> _contracts = [];
+    private List<SiteDto> _sites = [];
+    private bool _loading = true;
+
+    private readonly TableGroupDefinition<ContractDto> _groupDef = new()
+    {
+        GroupName = "Site", Indentation = false, Expandable = true, IsInitiallyExpanded = true,
+        Selector = c => c.SiteName
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        _sites = await SiteService.GetAllAsync();
+        _contracts = await ContractService.GetAllForFirmAsync();
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var p = new DialogParameters<ContractFormDialog> { { x => x.AllSites, _sites } };
+        var dialog = await DialogService.ShowAsync<ContractFormDialog>("Yeni Sözleşme", p,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled)
+            _contracts = await ContractService.GetAllForFirmAsync();
+    }
+
+    private async Task OpenEditDialog(ContractDto contract)
+    {
+        var p = new DialogParameters<ContractFormDialog>
+        {
+            { x => x.Contract, contract },
+            { x => x.AllSites, _sites }
+        };
+        var dialog = await DialogService.ShowAsync<ContractFormDialog>("Sözleşme Düzenle", p,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled)
+            _contracts = await ContractService.GetAllForFirmAsync();
+    }
+
+    private async Task TerminateAsync(ContractDto contract)
+    {
+        try
+        {
+            await ContractService.TerminateAsync(contract.Id, new TerminateContractCommand("Kullanıcı tarafından feshedildi."));
+            Snackbar.Add($"{contract.SiteName} sözleşmesi feshedildi.", Severity.Info);
+            _contracts = await ContractService.GetAllForFirmAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private static Color StatusColor(ContractStatus s) => s switch
+    {
+        ContractStatus.Active     => Color.Success,
+        ContractStatus.Draft      => Color.Default,
+        ContractStatus.Expired    => Color.Warning,
+        ContractStatus.Terminated => Color.Error,
+        _                         => Color.Default
+    };
+
+    private static string StatusLabel(ContractStatus s) => s switch
+    {
+        ContractStatus.Active     => "Aktif",
+        ContractStatus.Draft      => "Taslak",
+        ContractStatus.Expired    => "Süresi Doldu",
+        ContractStatus.Terminated => "Feshedildi",
+        _                         => s.ToString()
+    };
+}

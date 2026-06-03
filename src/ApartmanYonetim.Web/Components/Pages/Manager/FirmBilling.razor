@@ -1,0 +1,153 @@
+@page "/firma/faturalama"
+@attribute [Authorize(Roles = "Manager")]
+@inject ISiteObligationService ObligationService
+@inject AuthenticationStateProvider AuthProvider
+
+<PageTitle>Faturalama</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight:700">Site Faturalama</MudText>
+
+    @if (_obligations is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_obligations.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Faturalama kaydı bulunamadı.</MudAlert>
+    }
+    else
+    {
+        <!-- Özet kartlar -->
+        <MudGrid Spacing="3" Class="mb-4">
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="1" Class="pa-3 text-center">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Site</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700">@_obligations.Count</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="1" Class="pa-3 text-center">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Aylık Toplam</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700">
+                        @_obligations.Sum(o => o.MonthlyAmount).ToString("N2") ₺
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="1" Class="pa-3 text-center"
+                          Style="@(_obligations.Any(o => o.OverdueCount > 0) ? "border:1px solid var(--mud-palette-error)" : "")">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Geciken Ödeme</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight:700"
+                             Color="@(_obligations.Any(o => o.OverdueCount > 0) ? Color.Error : Color.Success)">
+                        @_obligations.Sum(o => o.OverdueCount)
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Site tablosu -->
+        @foreach (var ob in _obligations)
+        {
+            <MudPaper Elevation="1" Class="pa-4 mb-3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-3">
+                    <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                        <MudChip T="string" Color="@SiteTypeColor(ob.SiteType)" Size="Size.Small">
+                            @SiteTypeLabel(ob.SiteType)
+                        </MudChip>
+                        <MudText Typo="Typo.h6" Style="font-weight:600">@ob.SiteName</MudText>
+                    </MudStack>
+                    <MudStack AlignItems="AlignItems.End" Spacing="0">
+                        <MudText Typo="Typo.h6" Style="font-weight:700">@ob.MonthlyAmount.ToString("N2") ₺/ay</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @ob.DaireCount daire
+                            @if (ob.BlokCount > 0) { <text> + @ob.BlokCount blok</text> }
+                            @if (ob.KisimCount > 0) { <text> + @ob.KisimCount kısım</text> }
+                        </MudText>
+                    </MudStack>
+                </MudStack>
+
+                @if (_sitePayments.TryGetValue(ob.Id, out var payments) && payments.Count > 0)
+                {
+                    <MudTable Items="payments" Dense="true" Elevation="0" Outlined="true">
+                        <HeaderContent>
+                            <MudTh>Dönem</MudTh>
+                            <MudTh Style="text-align:right">Borç (₺)</MudTh>
+                            <MudTh Style="text-align:right">Ödenen (₺)</MudTh>
+                            <MudTh>Vade</MudTh>
+                            <MudTh>Ödeme Tar.</MudTh>
+                            <MudTh>Durum</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.PeriodLabel</MudTd>
+                            <MudTd Style="text-align:right">@context.AmountDue.ToString("N2")</MudTd>
+                            <MudTd Style="text-align:right">@context.AmountPaid.ToString("N2")</MudTd>
+                            <MudTd>
+                                <MudText Color="@(context.DueDate < DateOnly.FromDateTime(DateTime.Today) && context.Status != ObligationPaymentStatus.Paid ? Color.Error : Color.Default)">
+                                    @context.DueDate.ToString("dd.MM.yyyy")
+                                </MudText>
+                            </MudTd>
+                            <MudTd>@(context.PaymentDate?.ToString("dd.MM.yyyy") ?? "—")</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small" Color="@StatusColor(context.Status)">
+                                    @StatusLabel(context.Status)
+                                </MudChip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Henüz ödeme kaydı oluşturulmamış.</MudText>
+                }
+            </MudPaper>
+        }
+
+        <MudAlert Severity="Severity.Info" Class="mt-3">
+            Fiyatlar sistem yöneticisi tarafından belirlenmektedir. Ödeme sorunları için yöneticinizle iletişime geçin.
+        </MudAlert>
+    }
+</MudContainer>
+
+@code {
+    private List<SiteObligationDto>? _obligations;
+    private Dictionary<int, List<ObligationPaymentDto>> _sitePayments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var firmSlug = auth.User.FindFirst("firm_slug")?.Value;
+        if (firmSlug is null) return;
+
+        _obligations = await ObligationService.GetObligationsByFirmAsync(firmSlug);
+        foreach (var ob in _obligations)
+            _sitePayments[ob.Id] = await ObligationService.GetPaymentsAsync(ob.Id);
+    }
+
+    private static Color SiteTypeColor(SiteType t) => t switch
+    {
+        SiteType.Apartman => Color.Default,
+        SiteType.TopluYapi => Color.Warning,
+        _ => Color.Primary
+    };
+    private static string SiteTypeLabel(SiteType t) => t switch
+    {
+        SiteType.Apartman => "Apartman",
+        SiteType.TopluYapi => "Toplu Yapı",
+        _ => "Site"
+    };
+    private static Color StatusColor(ObligationPaymentStatus s) => s switch
+    {
+        ObligationPaymentStatus.Paid => Color.Success,
+        ObligationPaymentStatus.Overdue => Color.Error,
+        ObligationPaymentStatus.Partial => Color.Warning,
+        _ => Color.Default
+    };
+    private static string StatusLabel(ObligationPaymentStatus s) => s switch
+    {
+        ObligationPaymentStatus.Paid => "Ödendi",
+        ObligationPaymentStatus.Overdue => "Gecikmiş",
+        ObligationPaymentStatus.Partial => "Kısmi",
+        _ => "Bekliyor"
+    };
+}

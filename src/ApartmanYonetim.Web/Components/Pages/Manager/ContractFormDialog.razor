@@ -1,0 +1,160 @@
+@using ApartmanYonetim.Domain.Enums
+@inject IFirmContractService ContractService
+@inject AuthenticationStateProvider AuthProvider
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="Guid" @bind-Value="_siteId" Label="Site" Variant="Variant.Outlined" Required="true"
+                       Disabled="@(Contract is not null)">
+                @foreach (var s in AllSites)
+                {
+                    <MudSelectItem Value="@s.Id">@s.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudTextField @bind-Value="_contractNumber" Label="Sözleşme No" Variant="Variant.Outlined"
+                          HelperText="Opsiyonel, iç takip için" />
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_startDate" Label="Başlangıç Tarihi" Required="true"
+                                   Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudDatePicker @bind-Date="_endDate" Label="Bitiş Tarihi"
+                                   Variant="Variant.Outlined" DateFormat="dd.MM.yyyy"
+                                   HelperText="Belirsiz süreliyse boş bırakın" />
+                </MudItem>
+            </MudGrid>
+
+            <MudSelect T="ContractStatus" @bind-Value="_status" Label="Durum" Variant="Variant.Outlined">
+                <MudSelectItem Value="@ContractStatus.Draft">Taslak</MudSelectItem>
+                <MudSelectItem Value="@ContractStatus.Active">Aktif</MudSelectItem>
+                <MudSelectItem Value="@ContractStatus.Expired">Süresi Doldu</MudSelectItem>
+                <MudSelectItem Value="@ContractStatus.Terminated">Feshedildi</MudSelectItem>
+            </MudSelect>
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" @bind-Value="_monthlyFee" Label="Aylık Yönetim Ücreti (₺)"
+                                     Variant="Variant.Outlined" Format="N2" Min="0" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="ManagementFeeType" @bind-Value="_feeType" Label="Ücret Tipi" Variant="Variant.Outlined">
+                        <MudSelectItem Value="@ManagementFeeType.Fixed">Sabit Tutar</MudSelectItem>
+                        <MudSelectItem Value="@ManagementFeeType.PerUnit">Daire Başına</MudSelectItem>
+                        <MudSelectItem Value="@ManagementFeeType.PerSqm">m² Başına</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Kapsam (hangi modüller dahil):</MudText>
+            <MudStack Row="true" Spacing="1" Style="flex-wrap:wrap">
+                <MudCheckBox @bind-Value="_scopeAidat" Label="Aidat" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_scopeMuhasebe" Label="Muhasebe" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_scopeAriza" Label="Arıza" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_scopeToplanti" Label="Toplantı" Color="Color.Primary" />
+                <MudCheckBox @bind-Value="_scopeDuyuru" Label="Duyuru" Color="Color.Primary" />
+            </MudStack>
+
+            <MudTextField @bind-Value="_notes" Label="Notlar" Variant="Variant.Outlined" Lines="3" />
+
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Kaydet
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public ContractDto? Contract { get; set; }
+    [Parameter] public List<SiteDto> AllSites { get; set; } = [];
+    [Parameter] public Guid? PreselectedSiteId { get; set; }
+
+    private Guid _siteId;
+    private string _contractNumber = "";
+    private DateTime? _startDate = DateTime.Today;
+    private DateTime? _endDate;
+    private ContractStatus _status = ContractStatus.Active;
+    private decimal _monthlyFee;
+    private ManagementFeeType _feeType = ManagementFeeType.Fixed;
+    private bool _scopeAidat = true, _scopeMuhasebe = true, _scopeAriza = true, _scopeToplanti = true, _scopeDuyuru = true;
+    private string _notes = "";
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Contract is not null)
+        {
+            _siteId = Contract.SiteId;
+            _contractNumber = Contract.ContractNumber ?? "";
+            _startDate = Contract.StartDate.ToDateTime(TimeOnly.MinValue);
+            _endDate = Contract.EndDate?.ToDateTime(TimeOnly.MinValue);
+            _status = Contract.Status;
+            _monthlyFee = Contract.MonthlyFee;
+            _feeType = Contract.FeeType;
+            _scopeAidat    = Contract.Scope.HasFlag(ContractScope.Aidat);
+            _scopeMuhasebe = Contract.Scope.HasFlag(ContractScope.Muhasebe);
+            _scopeAriza    = Contract.Scope.HasFlag(ContractScope.Ariza);
+            _scopeToplanti = Contract.Scope.HasFlag(ContractScope.Toplanti);
+            _scopeDuyuru   = Contract.Scope.HasFlag(ContractScope.Duyuru);
+            _notes = Contract.Notes ?? "";
+        }
+        else if (PreselectedSiteId.HasValue)
+        {
+            _siteId = PreselectedSiteId.Value;
+        }
+        else if (AllSites.Count > 0)
+        {
+            _siteId = AllSites[0].Id;
+        }
+    }
+
+    private ContractScope BuildScope()
+    {
+        var scope = ContractScope.None;
+        if (_scopeAidat)    scope |= ContractScope.Aidat;
+        if (_scopeMuhasebe) scope |= ContractScope.Muhasebe;
+        if (_scopeAriza)    scope |= ContractScope.Ariza;
+        if (_scopeToplanti) scope |= ContractScope.Toplanti;
+        if (_scopeDuyuru)   scope |= ContractScope.Duyuru;
+        return scope;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_siteId == Guid.Empty || _startDate is null)
+        { _error = "Site ve başlangıç tarihi zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            var cmd = new ContractCommand(
+                _siteId,
+                string.IsNullOrWhiteSpace(_contractNumber) ? null : _contractNumber.Trim(),
+                DateOnly.FromDateTime(_startDate.Value),
+                _endDate.HasValue ? DateOnly.FromDateTime(_endDate.Value) : null,
+                _status, BuildScope(), _feeType, _monthlyFee,
+                string.IsNullOrWhiteSpace(_notes) ? null : _notes.Trim(),
+                null);
+
+            if (Contract is null)
+                await ContractService.CreateAsync(cmd, userId);
+            else
+                await ContractService.UpdateAsync(Contract.Id, cmd);
+
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

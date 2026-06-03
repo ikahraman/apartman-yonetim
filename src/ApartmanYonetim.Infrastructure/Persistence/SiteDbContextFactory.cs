@@ -12,7 +12,7 @@ public class SiteDbContextFactory(string baseDirectory = "SiteDatabases")
     {
         var resolved = ResolvePath(dbFilePath);
         var opts = new DbContextOptionsBuilder<SiteDbContext>()
-            .UseSqlite($"Data Source={resolved}")
+            .UseSqlite($"Data Source={resolved};Cache=Shared;Mode=ReadWriteCreate")
             .Options;
         return new SiteDbContext(opts);
     }
@@ -23,6 +23,7 @@ public class SiteDbContextFactory(string baseDirectory = "SiteDatabases")
         Directory.CreateDirectory(Path.GetDirectoryName(resolved)!);
         var db = Create(dbFilePath);
         await db.Database.MigrateAsync();
+        await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
         return db;
     }
 }

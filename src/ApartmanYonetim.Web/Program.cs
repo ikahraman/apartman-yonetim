@@ -101,6 +101,11 @@ builder.Services.AddScoped<ISiteMaintenanceService, SiteMaintenanceService>();
 builder.Services.AddScoped<ISiteMeetingService, SiteMeetingService>();
 builder.Services.AddScoped<ISiteAccountingService, SiteAccountingService>();
 builder.Services.AddScoped<ISiteReportService, SiteReportService>();
+builder.Services.AddScoped<IFirmSubscriptionService, FirmSubscriptionService>();
+builder.Services.AddScoped<IFirmStaffService, FirmStaffService>();
+builder.Services.AddScoped<IFirmDashboardService, FirmDashboardService>();
+builder.Services.AddScoped<ISiteObligationService, SiteObligationService>();
+builder.Services.AddScoped<IFirmContractService, FirmContractService>();
 
 var app = builder.Build();
 

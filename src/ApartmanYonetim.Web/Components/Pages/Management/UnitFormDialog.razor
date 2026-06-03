@@ -9,7 +9,7 @@
                     <MudTextField @bind-Value="_number" Label="Daire No" Required="true" Variant="Variant.Outlined" />
                 </MudItem>
                 <MudItem xs="6">
-                    <MudSelect @bind-Value="_unitType" Label="Tür" Variant="Variant.Outlined">
+                    <MudSelect @bind-Value="_unitType" Label="Yapı Türü" Variant="Variant.Outlined">
                         <MudSelectItem Value="UnitType.Daire">Daire</MudSelectItem>
                         <MudSelectItem Value="UnitType.Dukkan">Dükkan</MudSelectItem>
                         <MudSelectItem Value="UnitType.Depo">Depo</MudSelectItem>
@@ -18,6 +18,19 @@
                     </MudSelect>
                 </MudItem>
             </MudGrid>
+
+            @if (_unitType == UnitType.Daire && _daireTypes.Count > 0)
+            {
+                <MudSelect @bind-Value="_daireTypeId" Label="Daire Tipi" Variant="Variant.Outlined"
+                           Clearable="true" HelperText="1+1, 2+1 vb.">
+                    <MudSelectItem Value="@((Guid?)null)">— Belirtilmemiş —</MudSelectItem>
+                    @foreach (var dt in _daireTypes)
+                    {
+                        <MudSelectItem Value="@((Guid?)dt.Id)">@dt.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
             @if (_blocks.Count > 0)
             {
                 <MudSelect @bind-Value="_blockId" Label="Blok" Variant="Variant.Outlined" Clearable="true">
@@ -31,16 +44,19 @@
             {
                 <MudTextField @bind-Value="_block" Label="Blok (serbest metin)" Variant="Variant.Outlined" />
             }
+
             <MudGrid Spacing="2">
-                <MudItem xs="6">
+                <MudItem xs="4">
                     <MudNumericField @bind-Value="_floor" Label="Kat" Variant="Variant.Outlined" />
                 </MudItem>
-                <MudItem xs="6">
+                <MudItem xs="4">
                     <MudNumericField @bind-Value="_sqm" Label="m²" Variant="Variant.Outlined" />
                 </MudItem>
+                <MudItem xs="4">
+                    <MudNumericField @bind-Value="_arsaPay" Label="Arsa Payı (‰)" Variant="Variant.Outlined" />
+                </MudItem>
             </MudGrid>
-            <MudNumericField @bind-Value="_arsaPay" Label="Arsa Payı (‰)" Variant="Variant.Outlined"
-                             HelperText="Arsa payı pay/payda (örn: 15.5)" />
+
             @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
         </MudStack>
     </DialogContent>
@@ -61,24 +77,28 @@
     private string _number = "";
     private string? _block;
     private Guid? _blockId;
+    private Guid? _daireTypeId;
     private int? _floor;
     private decimal? _sqm;
     private decimal? _arsaPay;
     private UnitType _unitType = UnitType.Daire;
     private List<SiteBlockDto> _blocks = [];
+    private List<DaireTypeDto> _daireTypes = [];
     private string? _error;
     private bool _busy;
 
     protected override async Task OnParametersSetAsync()
     {
         if (!string.IsNullOrEmpty(DbFilePath))
+        {
             _blocks = await ResidentService.GetBlocksAsync(DbFilePath);
-
+            _daireTypes = await ResidentService.GetDaireTypesAsync(DbFilePath);
+        }
         if (Unit is not null)
         {
             _number = Unit.Number; _block = Unit.Block; _floor = Unit.Floor;
             _sqm = Unit.SquareMeters; _unitType = Unit.UnitType;
-            _arsaPay = Unit.ArsaPay; _blockId = Unit.BlockId;
+            _arsaPay = Unit.ArsaPay; _blockId = Unit.BlockId; _daireTypeId = Unit.DaireTypeId;
         }
     }
 
@@ -89,7 +109,8 @@
         try
         {
             var blockText = _blockId.HasValue ? null : _block;
-            var cmd = new AddUnitCommand(_number, blockText, _floor, _sqm, _unitType, _arsaPay, _blockId);
+            var daireTypeId = _unitType == UnitType.Daire ? _daireTypeId : null;
+            var cmd = new AddUnitCommand(_number, blockText, _floor, _sqm, _unitType, _arsaPay, _blockId, daireTypeId);
             if (Unit is null) await ResidentService.AddUnitAsync(DbFilePath, cmd);
             else await ResidentService.UpdateUnitAsync(DbFilePath, Unit.Id, cmd);
             MudDialog.Close(DialogResult.Ok(true));

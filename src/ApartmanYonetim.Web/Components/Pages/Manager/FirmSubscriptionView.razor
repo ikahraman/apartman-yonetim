@@ -1,0 +1,136 @@
+@page "/firma/abonelik"
+@attribute [Authorize(Roles = "Manager")]
+@inject IFirmSubscriptionService SubService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+
+<PageTitle>Aboneliğim</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-4">
+    <MudText Typo="Typo.h5" Style="font-weight:700" Class="mb-4">Aboneliğim</MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_sub is null)
+    {
+        <MudAlert Severity="Severity.Info">Abonelik kaydı bulunamadı. Yöneticinizle iletişime geçin.</MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="2" Class="pa-4 mb-3">
+            <MudStack Spacing="2">
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.body1" Style="font-weight:600">Paket</MudText>
+                    <MudText>@_sub.PackageName
+                        @if (_sub.MaxSiteCount.HasValue)
+                        { <text> (@_sub.MaxSiteCount site)</text> }
+                    </MudText>
+                </MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.body1" Style="font-weight:600">Aylık Ücret</MudText>
+                    <MudText>@_sub.EffectiveMonthlyPrice.ToString("N0") ₺
+                        @if (_sub.CustomMonthlyPrice.HasValue)
+                        { <MudChip T="string" Size="Size.Small" Color="Color.Warning" Class="ml-1">Özel</MudChip> }
+                    </MudText>
+                </MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.body1" Style="font-weight:600">Durum</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="@StatusColor(_sub.Status)" Variant="Variant.Filled">
+                        @StatusLabel(_sub.Status)
+                    </MudChip>
+                </MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.body1" Style="font-weight:600">Aktif Site</MudText>
+                    <MudText Color="@(_sub.MaxSiteCount.HasValue && _sub.ActiveSiteCount >= _sub.MaxSiteCount ? Color.Error : Color.Default)">
+                        @_sub.ActiveSiteCount @(_sub.MaxSiteCount.HasValue ? $"/ {_sub.MaxSiteCount}" : "")
+                    </MudText>
+                </MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.body1" Style="font-weight:600">Sözleşme</MudText>
+                    <MudText>@_sub.ContractStartDate.ToString("dd.MM.yyyy") —
+                        @(_sub.ContractEndDate?.ToString("dd.MM.yyyy") ?? "Belirsiz")
+                    </MudText>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        <MudText Typo="Typo.h6" Style="font-weight:600" Class="mb-2">Son Ödemeler</MudText>
+        @if (_payments.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">Ödeme kaydı bulunamadı.</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="_payments" Dense="true" Elevation="2">
+                <HeaderContent>
+                    <MudTh>Dönem</MudTh>
+                    <MudTh>Tutar</MudTh>
+                    <MudTh>Son Tarih</MudTh>
+                    <MudTh>Durum</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@MonthName(context.PeriodMonth) @context.PeriodYear</MudTd>
+                    <MudTd>@context.AmountDue.ToString("N0") ₺</MudTd>
+                    <MudTd>@context.DueDate.ToString("dd.MM.yyyy")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@PayColor(context.PaymentStatus)" Variant="Variant.Filled">
+                            @PayLabel(context.PaymentStatus)
+                        </MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    }
+</MudContainer>
+
+@code {
+    private SubscriptionDto? _sub;
+    private List<PaymentRecordDto> _payments = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var firmSlug = auth.User.FindFirst("firm_slug")?.Value;
+        if (firmSlug is not null)
+        {
+            _sub = await SubService.GetSubscriptionByFirmAsync(firmSlug);
+            _payments = await SubService.GetPaymentRecordsAsync(firmSlug);
+        }
+        _loading = false;
+    }
+
+    private static Color StatusColor(SubscriptionStatus s) => s switch
+    {
+        SubscriptionStatus.Active  => Color.Success,
+        SubscriptionStatus.Trial   => Color.Info,
+        SubscriptionStatus.Overdue => Color.Error,
+        _                          => Color.Warning
+    };
+    private static string StatusLabel(SubscriptionStatus s) => s switch
+    {
+        SubscriptionStatus.Active  => "Aktif",
+        SubscriptionStatus.Trial   => "Deneme",
+        SubscriptionStatus.Overdue => "Gecikmiş",
+        SubscriptionStatus.Suspended => "Askıda",
+        _                          => s.ToString()
+    };
+    private static Color PayColor(PaymentRecordStatus s) => s switch
+    {
+        PaymentRecordStatus.Paid    => Color.Success,
+        PaymentRecordStatus.Partial => Color.Warning,
+        PaymentRecordStatus.Overdue => Color.Error,
+        _                           => Color.Default
+    };
+    private static string PayLabel(PaymentRecordStatus s) => s switch
+    {
+        PaymentRecordStatus.Paid    => "Ödendi",
+        PaymentRecordStatus.Partial => "Kısmi",
+        PaymentRecordStatus.Overdue => "Gecikmiş",
+        _                           => "Bekliyor"
+    };
+    private static string MonthName(int m) => new[]{"","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"}[m];
+}

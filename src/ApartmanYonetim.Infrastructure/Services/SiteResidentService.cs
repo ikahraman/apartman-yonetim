@@ -10,7 +10,11 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
     public async Task<List<UnitSummaryDto>> GetUnitsAsync(string dbFilePath)
     {
         await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
-        var units = await db.Units.Include(u => u.BlockRef).OrderBy(u => u.BlockRef!.Name).ThenBy(u => u.Block).ThenBy(u => u.Floor).ThenBy(u => u.Number).ToListAsync();
+        var units = await db.Units
+            .Include(u => u.BlockRef)
+            .Include(u => u.DaireType)
+            .OrderBy(u => u.BlockRef!.Name).ThenBy(u => u.Block).ThenBy(u => u.Floor).ThenBy(u => u.Number)
+            .ToListAsync();
         var residents = await db.Residents.Where(r => r.IsActive).ToListAsync();
         var residentByUnit = residents.ToDictionary(r => r.UnitId);
         return units.Select(u =>
@@ -18,7 +22,8 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
             residentByUnit.TryGetValue(u.Id, out var r);
             return new UnitSummaryDto(u.Id, u.Number, u.Block, u.Floor, u.SquareMeters, u.OccupancyType,
                 r?.Id, r?.FullName, r?.Phone, r?.ResidencyType, r?.Email,
-                u.UnitType, u.ArsaPay, u.BlockId, u.BlockRef?.Name);
+                u.UnitType, u.ArsaPay, u.BlockId, u.BlockRef?.Name,
+                u.DaireTypeId, u.DaireType?.Name);
         }).ToList();
     }
 
@@ -29,7 +34,7 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
         {
             Number = cmd.Number, Block = cmd.Block, Floor = cmd.Floor,
             SquareMeters = cmd.SquareMeters, UnitType = cmd.UnitType,
-            ArsaPay = cmd.ArsaPay, BlockId = cmd.BlockId
+            ArsaPay = cmd.ArsaPay, BlockId = cmd.BlockId, DaireTypeId = cmd.DaireTypeId
         };
         db.Units.Add(unit);
         await db.SaveChangesAsync();
@@ -43,7 +48,7 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
         var unit = await db.Units.FindAsync(unitId) ?? throw new InvalidOperationException("Daire bulunamadı.");
         unit.Number = cmd.Number; unit.Block = cmd.Block; unit.Floor = cmd.Floor;
         unit.SquareMeters = cmd.SquareMeters; unit.UnitType = cmd.UnitType;
-        unit.ArsaPay = cmd.ArsaPay; unit.BlockId = cmd.BlockId;
+        unit.ArsaPay = cmd.ArsaPay; unit.BlockId = cmd.BlockId; unit.DaireTypeId = cmd.DaireTypeId;
         await db.SaveChangesAsync();
     }
 
@@ -181,6 +186,122 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
         var units = await db.Units.Where(u => u.BlockId == blockId).ToListAsync();
         foreach (var u in units) u.BlockId = null;
         db.Blocks.Remove(block);
+        await db.SaveChangesAsync();
+    }
+
+    public async Task EnsureDefaultDaireTypesAsync(string dbFilePath)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        if (await db.DaireTypes.AnyAsync()) return;
+        var defaults = new[]
+        {
+            new SiteDaireType { Name = "1+0", DisplayOrder = 1, IsDefault = true },
+            new SiteDaireType { Name = "1+1", DisplayOrder = 2, IsDefault = true },
+            new SiteDaireType { Name = "2+1", DisplayOrder = 3, IsDefault = true },
+            new SiteDaireType { Name = "3+1", DisplayOrder = 4, IsDefault = true },
+            new SiteDaireType { Name = "4+1", DisplayOrder = 5, IsDefault = true },
+        };
+        db.DaireTypes.AddRange(defaults);
+        await db.SaveChangesAsync();
+    }
+
+    public async Task<List<DaireTypeDto>> GetDaireTypesAsync(string dbFilePath)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        return await db.DaireTypes
+            .Where(d => d.IsActive)
+            .OrderBy(d => d.DisplayOrder).ThenBy(d => d.Name)
+            .Select(d => new DaireTypeDto(d.Id, d.Name, d.IsActive, d.DisplayOrder, d.IsDefault))
+            .ToListAsync();
+    }
+
+    public async Task<DaireTypeDto> AddDaireTypeAsync(string dbFilePath, DaireTypeCommand cmd)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var d = new SiteDaireType { Name = cmd.Name.Trim(), DisplayOrder = cmd.DisplayOrder };
+        db.DaireTypes.Add(d);
+        await db.SaveChangesAsync();
+        return new DaireTypeDto(d.Id, d.Name, d.IsActive, d.DisplayOrder, d.IsDefault);
+    }
+
+    public async Task UpdateDaireTypeAsync(string dbFilePath, Guid id, DaireTypeCommand cmd)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var d = await db.DaireTypes.FindAsync(id) ?? throw new KeyNotFoundException();
+        d.Name = cmd.Name.Trim(); d.DisplayOrder = cmd.DisplayOrder;
+        await db.SaveChangesAsync();
+    }
+
+    public async Task DeleteDaireTypeAsync(string dbFilePath, Guid id)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var d = await db.DaireTypes.FindAsync(id) ?? throw new KeyNotFoundException();
+        if (d.IsDefault) throw new InvalidOperationException("Varsayılan tipler silinemez.");
+        d.IsActive = false;
+        await db.SaveChangesAsync();
+    }
+
+    public async Task<int> GenerateUnitsAsync(string dbFilePath, List<BlockGenConfig> configs)
+    {
+        await EnsureDefaultDaireTypesAsync(dbFilePath);
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        int total = 0;
+        foreach (var cfg in configs)
+        {
+            int seq = 1;
+            for (int floor = 1; floor <= cfg.FloorCount; floor++)
+            {
+                for (int pos = 1; pos <= cfg.UnitsPerFloor; pos++)
+                {
+                    var number = cfg.Code is not null ? $"{cfg.Code}-{seq}" : $"{seq}";
+                    db.Units.Add(new SiteUnit
+                    {
+                        Number = number, Block = cfg.Code, Floor = floor,
+                        SquareMeters = 0, UnitType = UnitType.Daire, ArsaPay = 0,
+                        BlockId = cfg.BlockId
+                    });
+                    seq++; total++;
+                }
+            }
+        }
+        await db.SaveChangesAsync();
+        return total;
+    }
+
+    public async Task<List<BlockAssignmentDto>> GetBlockAssignmentsAsync(string dbFilePath, Guid blockId)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        return await db.BlockAssignments
+            .Include(a => a.Block)
+            .Where(a => a.BlockId == blockId)
+            .OrderByDescending(a => a.StartDate)
+            .Select(a => new BlockAssignmentDto(a.Id, a.BlockId, a.Block.Name,
+                a.ManagerUserId, a.ManagerDisplayName, a.StartDate, a.EndDate,
+                a.EndDate == null || a.EndDate >= DateOnly.FromDateTime(DateTime.Today)))
+            .ToListAsync();
+    }
+
+    public async Task AddBlockAssignmentAsync(string dbFilePath, Guid blockId, BlockAssignmentCommand cmd)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        // Mevcut aktif atamayı kapat
+        var active = await db.BlockAssignments
+            .Where(a => a.BlockId == blockId && a.EndDate == null)
+            .ToListAsync();
+        foreach (var a in active) a.EndDate = cmd.StartDate.AddDays(-1);
+        db.BlockAssignments.Add(new SiteBlockAssignment
+        {
+            BlockId = blockId, ManagerUserId = cmd.ManagerUserId,
+            ManagerDisplayName = cmd.ManagerDisplayName, StartDate = cmd.StartDate
+        });
+        await db.SaveChangesAsync();
+    }
+
+    public async Task EndBlockAssignmentAsync(string dbFilePath, int assignmentId)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var a = await db.BlockAssignments.FindAsync(assignmentId) ?? throw new KeyNotFoundException();
+        a.EndDate = DateOnly.FromDateTime(DateTime.Today);
         await db.SaveChangesAsync();
     }
 }

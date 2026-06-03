@@ -17,6 +17,81 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.8");
 
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.FirmPackage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("MaxSiteCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MinSiteCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MonthlyPrice")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FirmPackages");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.FirmPaymentRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("AmountDue")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FirmSlug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("PaymentDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PaymentStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PeriodMonth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PeriodYear")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FirmSlug", "PeriodYear", "PeriodMonth")
+                        .IsUnique();
+
+                    b.ToTable("FirmPaymentRecords");
+                });
+
             modelBuilder.Entity("ApartmanYonetim.Domain.Entities.FirmRegistration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -44,12 +119,276 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("TaxNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TaxOffice")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Slug")
                         .IsUnique();
 
                     b.ToTable("FirmRegistrations");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.FirmSubscription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly?>("ContractEndDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ContractStartDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("CustomMonthlyPrice")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("FirmPackageId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FirmSlug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FirmPackageId");
+
+                    b.HasIndex("FirmSlug")
+                        .IsUnique();
+
+                    b.ToTable("FirmSubscriptions");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteBillingConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DefaultPeriod")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MinimumMonthly")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("PricePerBlok")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("PricePerDaire")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("PricePerKisim")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SiteBillingConfigs");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteBillingTier", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("MaxDaire")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MinDaire")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MonthlyAmount")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SiteBillingTiers");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteObligation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BillingPeriod")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BlokCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DaireCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FirmSlug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("KisimCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MonthlyAmount")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("PricePerBlok")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("PricePerDaire")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("PricePerKisim")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SiteName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SiteType")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SiteId")
+                        .IsUnique();
+
+                    b.ToTable("SiteObligations");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteObligationPayment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("AmountDue")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ObligationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly?>("PaymentDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecordedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ObligationId");
+
+                    b.ToTable("SiteObligationPayments");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SystemAuditLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActionType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Changes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Timestamp");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("SystemAuditLogs");
                 });
 
             modelBuilder.Entity("ApartmanYonetim.Infrastructure.Identity.AppUser", b =>
@@ -256,6 +595,28 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.FirmSubscription", b =>
+                {
+                    b.HasOne("ApartmanYonetim.Domain.Entities.FirmPackage", "Package")
+                        .WithMany()
+                        .HasForeignKey("FirmPackageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Package");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteObligationPayment", b =>
+                {
+                    b.HasOne("ApartmanYonetim.Domain.Entities.SiteObligation", "Obligation")
+                        .WithMany("Payments")
+                        .HasForeignKey("ObligationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Obligation");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -305,6 +666,11 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Main
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.SiteObligation", b =>
+                {
+                    b.Navigation("Payments");
                 });
 #pragma warning restore 612, 618
         }

@@ -12,6 +12,16 @@
             {
                 <MudTextField Value="@Firm.Slug" Label="Slug (URL)" Variant="Variant.Outlined" ReadOnly="true" HelperText="Slug değiştirilemez." />
             }
+            <MudDivider />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Vergi Bilgileri (SuperAdmin)</MudText>
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_taxNumber" Label="Vergi No" Variant="Variant.Outlined" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_taxOffice" Label="Vergi Dairesi" Variant="Variant.Outlined" />
+                </MudItem>
+            </MudGrid>
             @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
         </MudStack>
     </DialogContent>
@@ -28,14 +38,17 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public FirmRegDto? Firm { get; set; }
 
-    private string _name = "";
-    private string _slug = "";
+    private string _name = "", _slug = "", _taxNumber = "", _taxOffice = "";
     private string? _error;
     private bool _busy;
 
     protected override void OnParametersSet()
     {
-        if (Firm is not null) { _name = Firm.Name; _slug = Firm.Slug; }
+        if (Firm is not null)
+        {
+            _name = Firm.Name; _slug = Firm.Slug;
+            _taxNumber = Firm.TaxNumber ?? ""; _taxOffice = Firm.TaxOffice ?? "";
+        }
     }
 
     private async Task SubmitAsync()
@@ -46,15 +59,17 @@
         try
         {
             var slug = _slug.Trim().ToLower();
+            var taxNo = string.IsNullOrWhiteSpace(_taxNumber) ? null : _taxNumber.Trim();
+            var taxOfc = string.IsNullOrWhiteSpace(_taxOffice) ? null : _taxOffice.Trim();
             if (Firm is null)
             {
                 if (await FirmService.SlugExistsAsync(slug))
                 { _error = "Bu slug zaten kullanımda."; return; }
-                await FirmService.CreateAsync(new FirmRegCommand(_name.Trim(), slug));
+                await FirmService.CreateAsync(new FirmRegCommand(_name.Trim(), slug, taxNo, taxOfc));
             }
             else
             {
-                await FirmService.UpdateAsync(Firm.Id, new FirmRegCommand(_name.Trim(), slug));
+                await FirmService.UpdateAsync(Firm.Id, new FirmRegCommand(_name.Trim(), Firm.Slug, taxNo, taxOfc));
             }
             MudDialog.Close(DialogResult.Ok(true));
         }

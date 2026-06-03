@@ -1,0 +1,72 @@
+@inject IFirmSubscriptionService SubService
+@inject AuthenticationStateProvider AuthProvider
+@using System.Security.Claims
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudSelect T="int" @bind-Value="_packageId" Label="Paket" Variant="Variant.Outlined" Required="true">
+                @foreach (var pkg in _packages)
+                {
+                    <MudSelectItem Value="pkg.Id">
+                        @pkg.Name — @(pkg.MonthlyPrice == 0 ? "Özel" : $"{pkg.MonthlyPrice:N0} ₺")
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudDatePicker @bind-Date="_start" Label="Sözleşme Başlangıç"
+                           Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+            <MudDatePicker @bind-Date="_end" Label="Sözleşme Bitiş (opsiyonel)"
+                           Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Clearable="true" />
+            <MudSelect T="SubscriptionStatus" @bind-Value="_status" Label="Durum" Variant="Variant.Outlined">
+                <MudSelectItem Value="SubscriptionStatus.Trial">Deneme</MudSelectItem>
+                <MudSelectItem Value="SubscriptionStatus.Active">Aktif</MudSelectItem>
+            </MudSelect>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Oluştur
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string FirmSlug { get; set; } = default!;
+
+    private List<PackageDto> _packages = [];
+    private int _packageId;
+    private DateTime? _start = DateTime.Today;
+    private DateTime? _end;
+    private SubscriptionStatus _status = SubscriptionStatus.Trial;
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _packages = await SubService.GetPackagesAsync();
+        if (_packages.Count > 0) _packageId = _packages[0].Id;
+    }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            var userName = authState.User.FindFirst(ClaimTypes.Email)?.Value ?? "admin";
+            var cmd = new SubscriptionCommand(
+                FirmSlug, _packageId,
+                DateOnly.FromDateTime(_start ?? DateTime.Today),
+                _end.HasValue ? DateOnly.FromDateTime(_end.Value) : null,
+                null, _status, null);
+            await SubService.CreateSubscriptionAsync(cmd, userName);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

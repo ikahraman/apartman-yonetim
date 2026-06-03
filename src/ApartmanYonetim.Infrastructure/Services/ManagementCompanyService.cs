@@ -6,10 +6,14 @@ namespace ApartmanYonetim.Infrastructure.Services;
 
 public class ManagementCompanyService(FirmDbContext db) : IManagementCompanyService
 {
+    private static CompanyDto ToDto(ManagementCompany c, int siteCount) =>
+        new(c.Id, c.Name, c.Slug, c.Email, c.Phone, c.Address,
+            c.ContactPerson, c.Website, c.LogoUrl, c.IsActive, siteCount);
+
     public async Task<List<CompanyDto>> GetAllAsync()
         => await db.Companies.Include(c => c.Sites)
             .OrderBy(c => c.Name)
-            .Select(c => new CompanyDto(c.Id, c.Name, c.Slug, c.Email, c.Phone, c.Address, c.IsActive, c.Sites.Count))
+            .Select(c => ToDto(c, c.Sites.Count))
             .ToListAsync();
 
     public async Task<List<CompanyDto>> GetForUserAsync(string userId)
@@ -20,11 +24,12 @@ public class ManagementCompanyService(FirmDbContext db) : IManagementCompanyServ
         var company = new ManagementCompany
         {
             Name = cmd.Name, Slug = cmd.Slug,
-            Email = cmd.Email, Phone = cmd.Phone, Address = cmd.Address
+            Email = cmd.Email, Phone = cmd.Phone, Address = cmd.Address,
+            ContactPerson = cmd.ContactPerson, Website = cmd.Website, LogoUrl = cmd.LogoUrl
         };
         db.Companies.Add(company);
         await db.SaveChangesAsync();
-        return new CompanyDto(company.Id, company.Name, company.Slug, company.Email, company.Phone, company.Address, company.IsActive, 0);
+        return ToDto(company, 0);
     }
 
     public async Task UpdateAsync(Guid id, CompanyCommand cmd)
@@ -32,6 +37,7 @@ public class ManagementCompanyService(FirmDbContext db) : IManagementCompanyServ
         var c = await db.Companies.FindAsync(id) ?? throw new InvalidOperationException("Firma bulunamadı.");
         c.Name = cmd.Name; c.Slug = cmd.Slug;
         c.Email = cmd.Email; c.Phone = cmd.Phone; c.Address = cmd.Address;
+        c.ContactPerson = cmd.ContactPerson; c.Website = cmd.Website; c.LogoUrl = cmd.LogoUrl;
         await db.SaveChangesAsync();
     }
 

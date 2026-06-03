@@ -1,0 +1,59 @@
+@using ApartmanYonetim.Domain.Enums
+@inject IFirmStaffService StaffService
+@inject AuthenticationStateProvider AuthProvider
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_displayName" Label="Ad Soyad" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_email" Label="E-posta" Required="true"
+                          Variant="Variant.Outlined" InputType="InputType.Email" />
+            <MudTextField @bind-Value="_password" Label="Şifre" Required="true"
+                          Variant="Variant.Outlined" InputType="InputType.Password"
+                          HelperText="En az 8 karakter, büyük harf ve rakam içermeli" />
+            <MudSelect T="StaffRole" @bind-Value="_role" Label="Rol" Variant="Variant.Outlined">
+                <MudSelectItem Value="@StaffRole.SiteAdmin">Site Yöneticisi (SiteAdmin)</MudSelectItem>
+                <MudSelectItem Value="@StaffRole.SiteManager">Site Sorumlusu (SiteManager)</MudSelectItem>
+                <MudSelectItem Value="@StaffRole.Accountant">Muhasebeci (Accountant)</MudSelectItem>
+                <MudSelectItem Value="@StaffRole.Auditor">Denetçi (Auditor)</MudSelectItem>
+            </MudSelect>
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Site erişimini kayıt sonrası "Site Erişimi Düzenle" ile atayabilirsiniz.
+            </MudAlert>
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Ekle
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _displayName = "", _email = "", _password = "";
+    private StaffRole _role = StaffRole.SiteManager;
+    private string? _error;
+    private bool _busy;
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_displayName) || string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_password))
+        { _error = "Tüm alanlar zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var firmSlug = auth.User.FindFirst("firm_slug")?.Value ?? "";
+            var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            await StaffService.CreateAsync(firmSlug, new CreateStaffCommand(_displayName, _email, _password, _role), userId);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

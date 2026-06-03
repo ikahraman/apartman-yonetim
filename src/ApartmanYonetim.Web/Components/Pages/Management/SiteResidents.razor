@@ -26,6 +26,7 @@
             @if (!_readOnly)
             {
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.ViewModule" OnClick="OpenBlocksDialog">Bloklar</MudButton>
+                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Category" OnClick="OpenDaireTypesDialog">Daire Tipleri</MudButton>
                 <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddUnitDialog">Daire Ekle</MudButton>
             }
         </MudStack>
@@ -39,6 +40,7 @@
             <HeaderContent>
                 <MudTh>Daire</MudTh>
                 <MudTh>Tür</MudTh>
+                <MudTh>Daire Tipi</MudTh>
                 <MudTh>Blok / Kat</MudTh>
                 <MudTh>Arsa Payı</MudTh>
                 <MudTh>Durum</MudTh>
@@ -49,6 +51,13 @@
             <RowTemplate>
                 <MudTd><MudText Style="font-weight:500">@context.Number</MudText></MudTd>
                 <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Default">@UnitTypeLabel(context.UnitType)</MudChip></MudTd>
+                <MudTd>
+                    @if (context.DaireTypeName is not null)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@context.DaireTypeName</MudChip>
+                    }
+                    else { <MudText Color="Color.Secondary" Typo="Typo.caption">—</MudText> }
+                </MudTd>
                 <MudTd>@(context.BlockName ?? context.Block ?? "")@(context.Floor is not null ? $" · {context.Floor}.kat" : "")</MudTd>
                 <MudTd>@(context.ArsaPay.HasValue ? $"{context.ArsaPay:N2}‰" : "—")</MudTd>
                 <MudTd>
@@ -151,5 +160,13 @@
         var p = new DialogParameters<SiteBlocksDialog> { { x => x.DbFilePath, _site.DbFilePath }, { x => x.SiteType, _site.SiteType } };
         var dialog = await DialogService.ShowAsync<SiteBlocksDialog>("Blok Yönetimi", p, new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
         if (!(await dialog.Result)!.Canceled) await Reload();
+    }
+
+    private async Task OpenDaireTypesDialog()
+    {
+        if (_site is null) return;
+        var p = new DialogParameters<DaireTypeDialog> { { x => x.DbFilePath, _site.DbFilePath } };
+        await DialogService.ShowAsync<DaireTypeDialog>("Daire Tipleri", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
     }
 }

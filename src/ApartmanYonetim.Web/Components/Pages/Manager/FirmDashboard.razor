@@ -1,0 +1,144 @@
+@page "/firma/ozet"
+@attribute [Authorize(Roles = "Manager")]
+@inject IFirmDashboardService DashService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+
+<PageTitle>Genel Özet</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudText Typo="Typo.h5" Style="font-weight:700" Class="mb-4">Genel Özet</MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_overview is null)
+    {
+        <MudAlert Severity="Severity.Warning">Veri yüklenemedi.</MudAlert>
+    }
+    else
+    {
+        <!-- KPI Kartları -->
+        <MudGrid Spacing="3" Class="mb-4">
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Elevation="2" Class="pa-3 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Apartment" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Style="font-weight:700">@_overview.TotalSites</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Aktif Site</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Elevation="2" Class="pa-3 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Home" Color="Color.Info" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Style="font-weight:700">@_overview.TotalUnits</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Toplam Birim</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Elevation="2" Class="pa-3 text-center">
+                    @{ var occRate = _overview.TotalUnits > 0 ? (decimal)_overview.OccupiedUnits / _overview.TotalUnits * 100 : 0; }
+                    <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Success" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Style="font-weight:700">%@((int)occRate)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Doluluk Oranı</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Elevation="2" Class="pa-3 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.AccountBalance"
+                             Color="@(_overview.AvgCollectionRate >= 80 ? Color.Success : Color.Warning)"
+                             Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Style="font-weight:700">%@((int)_overview.AvgCollectionRate)</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Ort. Tahsilat</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Elevation="2" Class="pa-3 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Build"
+                             Color="@(_overview.TotalOpenMaintenance > 5 ? Color.Error : Color.Warning)"
+                             Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Style="font-weight:700">@_overview.TotalOpenMaintenance</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Açık Arıza</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="6" sm="4" md="2">
+                <MudPaper Elevation="2" Class="pa-3 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.TrendingUp"
+                             Color="@(_overview.TotalYtdBalance >= 0 ? Color.Success : Color.Error)"
+                             Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Style="@($"font-weight:700;color:var(--mud-palette-{(_overview.TotalYtdBalance >= 0 ? "success" : "error")})")">
+                        @(_overview.TotalYtdBalance >= 0 ? "+" : "")@((int)(_overview.TotalYtdBalance / 1000))K ₺
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Yıllık Net</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- Site Bazlı Tablo -->
+        <MudText Typo="Typo.h6" Style="font-weight:600" Class="mb-2">Site Bazlı Durum</MudText>
+        <MudTable Items="_overview.Sites" Hover="true" Elevation="2" Dense="true">
+            <HeaderContent>
+                <MudTh>Site</MudTh>
+                <MudTh>Birim</MudTh>
+                <MudTh>Doluluk</MudTh>
+                <MudTh>Bu Ay Tahsilat</MudTh>
+                <MudTh>Açık Arıza</MudTh>
+                <MudTh>Yıllık Net</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @{ var occ = context.TotalUnits > 0 ? (decimal)context.OccupiedUnits / context.TotalUnits * 100 : 0; }
+                <MudTd><MudText Style="font-weight:600">@context.SiteName</MudText></MudTd>
+                <MudTd>@context.OccupiedUnits / @context.TotalUnits</MudTd>
+                <MudTd>
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                        <MudProgressLinear Value="@((double)occ)" Color="@(occ >= 80 ? Color.Success : Color.Warning)"
+                                           Style="width:60px" Rounded="true" />
+                        <MudText Typo="Typo.caption">%@((int)occ)</MudText>
+                    </MudStack>
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.CollectionRateThisMonth >= 80 ? Color.Success : context.CollectionRateThisMonth >= 50 ? Color.Warning : Color.Error)"
+                             Variant="Variant.Filled">
+                        %@((int)context.CollectionRateThisMonth)
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    @if (context.OpenMaintenanceCount > 0)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">@context.OpenMaintenanceCount açık</MudChip>
+                    }
+                    else
+                    {
+                        <MudText Color="Color.Success" Typo="Typo.caption">Temiz</MudText>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudText Color="@(context.YtdBalance >= 0 ? Color.Success : Color.Error)" Style="font-weight:600">
+                        @(context.YtdBalance >= 0 ? "+" : "")@context.YtdBalance.ToString("N0") ₺
+                    </MudText>
+                </MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => Nav.NavigateTo($"/site/{context.SiteId}/ozet"))" />
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private FirmOverviewDto? _overview;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var firmSlug = auth.User.FindFirst("firm_slug")?.Value;
+        if (firmSlug is not null)
+            _overview = await DashService.GetOverviewAsync(firmSlug);
+        _loading = false;
+    }
+}

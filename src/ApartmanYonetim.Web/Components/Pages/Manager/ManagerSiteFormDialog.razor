@@ -1,0 +1,104 @@
+@inject ISiteManagementService SiteService
+@inject IManagementCompanyService CompanyService
+@inject ISiteObligationService ObligationService
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">Temel Bilgiler</MudText>
+            <MudTextField @bind-Value="_name" Label="Site Adı" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_slug" Label="Slug (URL kısaltma)" Required="true"
+                          Variant="Variant.Outlined" HelperText="Küçük harf, tire — örn: guzel-apartman" />
+            <MudSelect @bind-Value="_siteType" Label="Site Tipi" Variant="Variant.Outlined">
+                <MudSelectItem Value="SiteType.Apartman">Apartman (tek bina)</MudSelectItem>
+                <MudSelectItem Value="SiteType.Site">Site (çok bloklu)</MudSelectItem>
+                <MudSelectItem Value="SiteType.TopluYapi">Toplu Yapı (KMK 66-72)</MudSelectItem>
+            </MudSelect>
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="_city" Label="Şehir" Variant="Variant.Outlined" />
+                </MudItem>
+                @if (_siteType == SiteType.Apartman)
+                {
+                    <MudItem xs="6">
+                        <MudNumericField @bind-Value="_unitCount" Label="Daire Sayısı" Min="1"
+                                         Variant="Variant.Outlined" />
+                    </MudItem>
+                }
+            </MudGrid>
+            <MudTextField @bind-Value="_address" Label="Adres" Variant="Variant.Outlined" Lines="2" />
+
+            <MudDivider Class="my-1" />
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">Sözleşme Bilgileri</MudText>
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudDatePicker @bind-Date="_contractStart" Label="Başlangıç"
+                                   Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudDatePicker @bind-Date="_contractEnd" Label="Bitiş"
+                                   Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true" />
+                </MudItem>
+            </MudGrid>
+            <MudNumericField @bind-Value="_fee" Label="Aylık Yönetim Ücreti (₺)"
+                             Variant="Variant.Outlined" Min="0" Format="N0" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            @(_siteType == SiteType.Apartman ? "Kaydet" : "Kaydet ve Yapıyı Düzenle →")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _name = "", _slug = "", _city = "", _address = "";
+    private SiteType _siteType = SiteType.Site;
+    private int _unitCount = 10;
+    private DateTime? _contractStart, _contractEnd;
+    private decimal _fee;
+    private string? _error;
+    private bool _busy;
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_slug))
+        { _error = "Site adı ve slug zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            var companies = await CompanyService.GetForUserAsync(userId);
+            var company = companies.FirstOrDefault() ?? throw new InvalidOperationException("Firma bulunamadı.");
+
+            var cmd = new SiteCommand(
+                company.Id, _name.Trim(), _slug.Trim().ToLower(),
+                _address, _city, _siteType == SiteType.Apartman ? _unitCount : 0,
+                _contractStart.HasValue ? DateOnly.FromDateTime(_contractStart.Value) : null,
+                _contractEnd.HasValue ? DateOnly.FromDateTime(_contractEnd.Value) : null,
+                _fee > 0 ? _fee : null, null, _siteType);
+
+            var created = await SiteService.CreateAsync(cmd);
+
+            var firmSlug = auth.User.FindFirst("firm_slug")?.Value ?? company.Id.ToString();
+            await ObligationService.CreateObligationAsync(
+                created.Id, created.Name, _siteType, firmSlug,
+                _siteType == SiteType.Apartman ? _unitCount : 0, 0, 0);
+
+            MudDialog.Close(DialogResult.Ok(created));
+
+            if (_siteType != SiteType.Apartman)
+                Nav.NavigateTo($"/site/{created.Id}/sakinler");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

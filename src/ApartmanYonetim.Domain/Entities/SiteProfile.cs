@@ -16,11 +16,6 @@ public class SiteProfile
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    // Sözleşme bilgileri
-    public DateOnly? ContractStartDate { get; set; }
-    public DateOnly? ContractEndDate { get; set; }
-    public decimal? MonthlyManagementFee { get; set; }
-    public string? ContractNotes { get; set; }
-
-    public List<UserSiteAccess> UserAccess { get; set; } = [];
+    public List<SiteContract> Contracts { get; set; } = [];
+    public List<SiteStaffAssignment> StaffAssignments { get; set; } = [];
 }

@@ -116,6 +116,63 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Site
                     b.ToTable("Blocks");
                 });
 
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.Site.SiteBlockAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("BlockId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ManagerDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ManagerUserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BlockId");
+
+                    b.ToTable("BlockAssignments");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.Site.SiteDaireType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DaireTypes");
+                });
+
             modelBuilder.Entity("ApartmanYonetim.Domain.Entities.Site.SiteFeePayment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -168,6 +225,9 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Site
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Amount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("AppliesToDaireTypeId")
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("AppliesToUnitType")
@@ -401,6 +461,9 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Site
                     b.Property<Guid?>("BlockId")
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("DaireTypeId")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("Floor")
                         .HasColumnType("INTEGER");
 
@@ -421,6 +484,8 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Site
 
                     b.HasIndex("BlockId");
 
+                    b.HasIndex("DaireTypeId");
+
                     b.ToTable("Units");
                 });
 
@@ -432,6 +497,17 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Site
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Kisim");
+                });
+
+            modelBuilder.Entity("ApartmanYonetim.Domain.Entities.Site.SiteBlockAssignment", b =>
+                {
+                    b.HasOne("ApartmanYonetim.Domain.Entities.Site.SiteBlock", "Block")
+                        .WithMany("Assignments")
+                        .HasForeignKey("BlockId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Block");
                 });
 
             modelBuilder.Entity("ApartmanYonetim.Domain.Entities.Site.SiteMeetingMinutes", b =>
@@ -450,11 +526,20 @@ namespace ApartmanYonetim.Infrastructure.Migrations.Site
                         .HasForeignKey("BlockId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("ApartmanYonetim.Domain.Entities.Site.SiteDaireType", "DaireType")
+                        .WithMany()
+                        .HasForeignKey("DaireTypeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("BlockRef");
+
+                    b.Navigation("DaireType");
                 });
 
             modelBuilder.Entity("ApartmanYonetim.Domain.Entities.Site.SiteBlock", b =>
                 {
+                    b.Navigation("Assignments");
+
                     b.Navigation("Units");
                 });
 

@@ -10,13 +10,17 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
 {
     public async Task<List<FirmRegDto>> GetAllAsync()
         => await db.FirmRegistrations.OrderBy(f => f.Name)
-            .Select(f => new FirmRegDto(f.Id, f.Name, f.Slug, f.IsActive, f.CreatedAt))
+            .Select(f => new FirmRegDto(f.Id, f.Name, f.Slug, f.TaxNumber, f.TaxOffice, f.IsActive, f.CreatedAt))
             .ToListAsync();
 
     public async Task<FirmRegDto> CreateAsync(FirmRegCommand cmd)
     {
         var dbPath = firmFactory.ResolvePath(cmd.Slug);
-        var reg = new FirmRegistration { Name = cmd.Name, Slug = cmd.Slug, DbFilePath = dbPath };
+        var reg = new FirmRegistration
+        {
+            Name = cmd.Name, Slug = cmd.Slug, DbFilePath = dbPath,
+            TaxNumber = cmd.TaxNumber, TaxOffice = cmd.TaxOffice
+        };
         db.FirmRegistrations.Add(reg);
         await db.SaveChangesAsync();
 
@@ -27,13 +31,15 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
             await firmDb.SaveChangesAsync();
         }
 
-        return new FirmRegDto(reg.Id, reg.Name, reg.Slug, reg.IsActive, reg.CreatedAt);
+        return new FirmRegDto(reg.Id, reg.Name, reg.Slug, reg.TaxNumber, reg.TaxOffice, reg.IsActive, reg.CreatedAt);
     }
 
     public async Task UpdateAsync(Guid id, FirmRegCommand cmd)
     {
         var reg = await db.FirmRegistrations.FindAsync(id) ?? throw new InvalidOperationException("Firma bulunamadı.");
         reg.Name = cmd.Name;
+        reg.TaxNumber = cmd.TaxNumber;
+        reg.TaxOffice = cmd.TaxOffice;
         await db.SaveChangesAsync();
 
         await using var firmDb = firmFactory.CreateBySlug(reg.Slug);
@@ -53,11 +59,20 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
             try
             {
                 await using var firmDb = firmFactory.CreateBySlug(firm.Slug);
-                var sites = await firmDb.Sites.Include(s => s.Company).ToListAsync();
+                var sites = await firmDb.Sites
+                    .Include(s => s.Company)
+                    .Include(s => s.Contracts)
+                    .ToListAsync();
                 foreach (var s in sites)
-                    result.Add(new AdminSiteDto(s.Id, s.CompanyId, firm.Slug, firm.Name, s.Name, s.Slug,
+                {
+                    var contract = s.Contracts.Where(c => c.Status == ContractStatus.Active).MaxBy(c => c.StartDate);
+                    result.Add(new AdminSiteDto(
+                        s.Id, s.CompanyId, firm.Slug, firm.Name, s.Name, s.Slug,
                         s.City, s.UnitCount, s.DbFilePath, s.IsActive,
-                        s.ContractStartDate, s.ContractEndDate, s.MonthlyManagementFee, s.ContractNotes, s.SiteType));
+                        contract?.StartDate, contract?.EndDate,
+                        contract?.MonthlyFee, contract?.Notes, s.SiteType,
+                        contract?.Id));
+                }
             }
             catch { /* skip firm if db not accessible */ }
         }
@@ -74,12 +89,30 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
         {
             CompanyId = company.Id, Name = cmd.Name, Slug = cmd.Slug,
             Address = cmd.Address, City = cmd.City, UnitCount = cmd.UnitCount,
-            SiteType = cmd.SiteType, DbFilePath = dbPath,
-            ContractStartDate = cmd.ContractStartDate, ContractEndDate = cmd.ContractEndDate,
-            MonthlyManagementFee = cmd.MonthlyManagementFee, ContractNotes = cmd.ContractNotes
+            SiteType = cmd.SiteType, DbFilePath = dbPath
         };
         firmDb.Sites.Add(site);
         await firmDb.SaveChangesAsync();
+
+        Guid? contractId = null;
+        if (cmd.ContractStartDate.HasValue)
+        {
+            var contract = new SiteContract
+            {
+                SiteId = site.Id,
+                StartDate = cmd.ContractStartDate.Value,
+                EndDate = cmd.ContractEndDate,
+                MonthlyFee = cmd.MonthlyManagementFee ?? 0,
+                Notes = cmd.ContractNotes,
+                Status = ContractStatus.Active,
+                Scope = ContractScope.Tumu,
+                FeeType = ManagementFeeType.Fixed
+            };
+            firmDb.SiteContracts.Add(contract);
+            await firmDb.SaveChangesAsync();
+            contractId = contract.Id;
+        }
+
         await using var siteDb = await siteFactory.CreateAndMigrateAsync(dbPath);
         if (cmd.SiteType == SiteType.Apartman && cmd.UnitCount > 0)
         {
@@ -87,8 +120,10 @@ public class FirmRegistrationService(MainDbContext db, FirmDbContextFactory firm
                 siteDb.Units.Add(new SiteUnit { Number = i.ToString() });
             await siteDb.SaveChangesAsync();
         }
+
         return new AdminSiteDto(site.Id, site.CompanyId, firmSlug, company.Name, site.Name, site.Slug,
             site.City, site.UnitCount, site.DbFilePath, site.IsActive,
-            site.ContractStartDate, site.ContractEndDate, site.MonthlyManagementFee, site.ContractNotes, site.SiteType);
+            cmd.ContractStartDate, cmd.ContractEndDate, cmd.MonthlyManagementFee, cmd.ContractNotes,
+            site.SiteType, contractId);
     }
 }

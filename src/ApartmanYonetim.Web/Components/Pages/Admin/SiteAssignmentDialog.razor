@@ -1,5 +1,6 @@
 @inject FirmDbContextFactory FirmFactory
 @using ApartmanYonetim.Infrastructure.Persistence
+@using ApartmanYonetim.Domain.Entities
 @using Microsoft.EntityFrameworkCore
 
 <MudDialog>
@@ -47,8 +48,17 @@
         await using var firmDb = FirmFactory.CreateBySlug(FirmSlug);
         var sites = await firmDb.Sites.OrderBy(s => s.Name).ToListAsync();
         _allSites = sites.Select(s => new SiteRow(s.Id, s.Name)).ToList();
-        var current = await firmDb.UserSiteAccess.Where(a => a.UserId == UserId).Select(a => a.SiteId).ToListAsync();
-        _selected = current.ToHashSet();
+
+        // CompanyStaff kaydı varsa atanmış sitelerini yükle
+        var staff = await firmDb.CompanyStaff.FirstOrDefaultAsync(s => s.UserId == UserId);
+        if (staff is not null)
+        {
+            var current = await firmDb.SiteStaffAssignments
+                .Where(a => a.StaffId == staff.Id && a.RemovedAt == null)
+                .Select(a => a.SiteId)
+                .ToListAsync();
+            _selected = current.ToHashSet();
+        }
     }
 
     private void Toggle(Guid siteId, bool value)
@@ -64,10 +74,17 @@
         try
         {
             await using var firmDb = FirmFactory.CreateBySlug(FirmSlug);
-            var existing = await firmDb.UserSiteAccess.Where(a => a.UserId == UserId).ToListAsync();
-            firmDb.UserSiteAccess.RemoveRange(existing);
+            var staff = await firmDb.CompanyStaff.FirstOrDefaultAsync(s => s.UserId == UserId);
+            if (staff is null) { _error = "Kullanıcı için CompanyStaff kaydı bulunamadı."; return; }
+
+            var existing = await firmDb.SiteStaffAssignments
+                .Where(a => a.StaffId == staff.Id && a.RemovedAt == null)
+                .ToListAsync();
+            foreach (var e in existing) e.RemovedAt = DateTime.UtcNow;
+
             foreach (var siteId in _selected)
-                firmDb.UserSiteAccess.Add(new ApartmanYonetim.Domain.Entities.UserSiteAccess { UserId = UserId, SiteId = siteId });
+                firmDb.SiteStaffAssignments.Add(new SiteStaffAssignment { StaffId = staff.Id, SiteId = siteId });
+
             await firmDb.SaveChangesAsync();
             MudDialog.Close(DialogResult.Ok(true));
         }

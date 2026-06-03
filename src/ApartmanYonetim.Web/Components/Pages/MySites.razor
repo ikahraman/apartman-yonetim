@@ -1,7 +1,10 @@
 @page "/sitelerim"
-@attribute [Authorize(Roles = "Manager,SiteStaff,Auditor")]
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor,Accountant")]
 @inject ISiteManagementService SiteService
 @inject ISiteResidentService ResidentService
+@inject IFirmSubscriptionService SubService
+@inject ISiteObligationService ObligationService
+@inject IManagementCompanyService CompanyService
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
 @inject IDialogService DialogService
@@ -9,7 +12,60 @@
 <PageTitle>Sitelerim</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
-    <MudText Typo="Typo.h5" Style="font-weight:700" Class="mb-4">Yönettiğim Siteler</MudText>
+
+    @if (_isManager && _companyName is not null)
+    {
+        <MudPaper Elevation="0" Class="mb-4 pa-4"
+                  Style="background:linear-gradient(135deg,var(--mud-palette-primary) 0%,var(--mud-palette-primary-darken) 100%);border-radius:12px;color:#fff">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.h6" Style="font-weight:700;color:#fff">Hoş geldiniz, @_displayName</MudText>
+                    <MudText Typo="Typo.body2" Style="color:rgba(255,255,255,0.85)">
+                        @_companyName — Yönetici
+                    </MudText>
+                    <MudText Typo="Typo.caption" Style="color:rgba(255,255,255,0.7);margin-top:4px">
+                        Yönetmek istediğiniz siteyi seçip <strong>Yönet</strong> butonuna tıklayın.
+                        @if (_sites is not null)
+                        {
+                            <text> · @_sites.Count site · @_sites.Sum(s => s.UnitCount) birim</text>
+                        }
+                    </MudText>
+                </MudStack>
+                <MudButton Variant="Variant.Filled" Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.AddHome"
+                           OnClick="OpenAddSiteDialog"
+                           Style="font-weight:600">
+                    Yeni Site Ekle
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+
+    @if (_sub is not null)
+    {
+        @if (_sub.Status == SubscriptionStatus.Suspended || _sub.Status == SubscriptionStatus.Cancelled)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" Icon="@Icons.Material.Filled.Block">
+                <strong>Aboneliğiniz askıya alındı.</strong> Sisteme erişiminiz kısıtlanmıştır.
+                Ödeme ve abonelik durumu için yöneticinizle iletişime geçin.
+            </MudAlert>
+        }
+        else if (_sub.Status == SubscriptionStatus.Overdue)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" Icon="@Icons.Material.Filled.Warning">
+                <strong>Abonelik ödemesi gecikmiş.</strong> Ödemeniz yapılmazsa sistem erişiminiz kesilebilir.
+                Lütfen yöneticinizle iletişime geçin.
+            </MudAlert>
+        }
+    }
+
+    @if (_overdueObligations > 0)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4" Icon="@Icons.Material.Filled.AccountBalanceWallet">
+            <strong>@_overdueObligations gecikmiş site ödemesi</strong> var.
+            <MudLink Href="/firma/faturalama" Color="Color.Warning" Style="font-weight:600">Faturalama sayfasına git →</MudLink>
+        </MudAlert>
+    }
 
     @if (_sites is null)
     {
@@ -95,9 +151,15 @@
 </MudContainer>
 
 @code {
+    [SupplyParameterFromQuery(Name = "ekle")] private string? EkleParam { get; set; }
+
     private List<SiteDto>? _sites;
     private bool _isManager;
     private Guid? _loadingSiteId;
+    private SubscriptionDto? _sub;
+    private int _overdueObligations;
+    private string? _companyName;
+    private string? _displayName;
 
     private void GoToSite(Guid id)
     {
@@ -111,7 +173,33 @@
         var user = auth.User;
         var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
         _isManager = user.IsInRole("Manager") || user.IsInRole("SuperAdmin");
+        _displayName = user.FindFirst("DisplayName")?.Value ?? user.Identity?.Name ?? "";
         _sites = await SiteService.GetForUserAsync(userId);
+
+        var firmSlug = user.FindFirst("firm_slug")?.Value;
+        if (_isManager && firmSlug is not null)
+        {
+            _sub = await SubService.GetSubscriptionByFirmAsync(firmSlug);
+            var obs = await ObligationService.GetObligationsByFirmAsync(firmSlug);
+            _overdueObligations = obs.Sum(o => o.OverdueCount);
+            var companies = await CompanyService.GetForUserAsync(userId);
+            _companyName = companies.FirstOrDefault()?.Name;
+        }
+
+        if (EkleParam == "1" && _isManager)
+            await OpenAddSiteDialog();
+    }
+
+    private async Task OpenAddSiteDialog()
+    {
+        var dialog = await DialogService.ShowAsync<ManagerSiteFormDialog>("Yeni Site Ekle",
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled)
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            _sites = await SiteService.GetForUserAsync(userId);
+        }
     }
 
     private async Task OpenStructureDialog(SiteDto site)

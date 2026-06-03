@@ -1,0 +1,284 @@
+@inject ISiteManagementService SiteService
+@inject IManagementCompanyService CompanyService
+@inject ISiteResidentService ResidentService
+@inject IFirmStaffService StaffService
+@inject ISiteObligationService ObligationService
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+
+<MudDialog Style="min-width:600px">
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.LocationCity" Color="Color.Info" />
+            <MudText Typo="Typo.h6">Site Ekle</MudText>
+            <MudSpacer />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">Adım @(_step + 1) / 4</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Row="true" Spacing="1" Class="mb-4">
+            @foreach (var (label, i) in new[] { ("Temel Bilgi", 0), ("Bloklar", 1), ("Önizleme", 2), ("Yetkili", 3) })
+            {
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(i == _step ? Color.Info : i < _step ? Color.Success : Color.Default)"
+                         Variant="@(i == _step ? Variant.Filled : Variant.Outlined)">
+                    @(i < _step ? "✓ " : "")@label
+                </MudChip>
+                @if (i < 3) { <MudText Color="Color.Secondary">›</MudText> }
+            }
+        </MudStack>
+
+        <!-- ADIM 0: TEMEL BİLGİ -->
+        @if (_step == 0)
+        {
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_name" Label="Site Adı" Required="true" Variant="Variant.Outlined" />
+                <MudTextField @bind-Value="_slug" Label="Kısa Ad (URL)" Required="true" Variant="Variant.Outlined"
+                              HelperText="Küçük harf, tire ile — örn: guzel-site" />
+                <MudGrid Spacing="2">
+                    <MudItem xs="6"><MudTextField @bind-Value="_city" Label="Şehir" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="6"><MudNumericField @bind-Value="_fee" Label="Yönetim Ücreti (₺/ay)" Variant="Variant.Outlined" Min="0" Format="N0" /></MudItem>
+                </MudGrid>
+                <MudTextField @bind-Value="_address" Label="Adres" Variant="Variant.Outlined" Lines="2" />
+                <MudGrid Spacing="2">
+                    <MudItem xs="6"><MudDatePicker @bind-Date="_contractStart" Label="Sözleşme Başlangıç" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true" /></MudItem>
+                    <MudItem xs="6"><MudDatePicker @bind-Date="_contractEnd" Label="Sözleşme Bitiş" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true" /></MudItem>
+                </MudGrid>
+            </MudStack>
+        }
+
+        <!-- ADIM 1: BLOK TANIMLARI -->
+        @if (_step == 1)
+        {
+            <MudStack Spacing="3">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600">Blok Tanımları</MudText>
+                    <MudSpacer />
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add" OnClick="AddBlock">Blok Ekle</MudButton>
+                </MudStack>
+
+                @if (_blocks.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true">En az bir blok ekleyin.</MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="_blocks" Dense="true" Elevation="0" Outlined="true">
+                        <HeaderContent>
+                            <MudTh>Kod</MudTh><MudTh>Ad</MudTh><MudTh>Kat</MudTh><MudTh>Daire/Kat</MudTh><MudTh>Toplam</MudTh><MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd Style="width:80px">
+                                <MudTextField @bind-Value="context.Code" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </MudTd>
+                            <MudTd>
+                                <MudTextField @bind-Value="context.Name" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </MudTd>
+                            <MudTd Style="width:90px">
+                                <MudNumericField @bind-Value="context.FloorCount" Min="1" Max="40" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </MudTd>
+                            <MudTd Style="width:100px">
+                                <MudNumericField @bind-Value="context.UnitsPerFloor" Min="1" Max="20" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            </MudTd>
+                            <MudTd><MudText Style="font-weight:600">@(context.FloorCount * context.UnitsPerFloor)</MudText></MudTd>
+                            <MudTd>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                               OnClick="@(() => _blocks.Remove(context))" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Toplam: <strong>@_blocks.Sum(b => b.FloorCount * b.UnitsPerFloor) daire</strong>
+                    </MudText>
+                }
+            </MudStack>
+        }
+
+        <!-- ADIM 2: ÖNİZLEME -->
+        @if (_step == 2)
+        {
+            <MudStack Spacing="2">
+                <MudAlert Severity="Severity.Success" Dense="true">
+                    <strong>@_blocks.Sum(b => b.FloorCount * b.UnitsPerFloor) daire</strong> oluşturulacak.
+                </MudAlert>
+                @if (_monthlyFee.HasValue)
+                {
+                    <MudPaper Outlined="true" Class="pa-3" Style="border-color:var(--mud-palette-primary)">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2">Aylık Faturalama</MudText>
+                            <MudStack AlignItems="AlignItems.End" Spacing="0">
+                                <MudText Style="font-weight:700;color:var(--mud-palette-primary);font-size:1.1rem">
+                                    @_monthlyFee.Value.ToString("N0") ₺ / ay
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Sistem tarafından belirlenmektedir</MudText>
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+                }
+                @foreach (var blok in _blocks)
+                {
+                    <MudPaper Outlined="true" Class="pa-3">
+                        <MudText Typo="Typo.subtitle2" Style="font-weight:600" Class="mb-2">
+                            @blok.Name (@blok.Code) — @(blok.FloorCount * blok.UnitsPerFloor) daire
+                        </MudText>
+                        <MudStack Row="true" Style="flex-wrap:wrap" Spacing="1">
+                            @for (int i = 1; i <= Math.Min(blok.FloorCount * blok.UnitsPerFloor, 16); i++)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">
+                                    @($"{blok.Code}-{i}")
+                                </MudChip>
+                            }
+                            @if (blok.FloorCount * blok.UnitsPerFloor > 16)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">... @(blok.FloorCount * blok.UnitsPerFloor) daire</MudText>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+
+        <!-- ADIM 3: YETKİLİ (OPSİYONEL) -->
+        @if (_step == 3)
+        {
+            <MudStack Spacing="2">
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    Her blok için yetkili atayabilirsiniz. Bu adım isteğe bağlıdır, sonradan da değiştirilebilir.
+                </MudAlert>
+                @foreach (var blok in _blocks)
+                {
+                    var b = blok;
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudText Style="min-width:120px;font-weight:600">@b.Name</MudText>
+                        <MudSelect T="string" @bind-Value="b.ManagerUserId" Label="Yetkili Manager"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1" Clearable="true">
+                            @foreach (var m in _managers)
+                            {
+                                <MudSelectItem Value="@m.Id">@m.DisplayName (@m.Email)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudStack>
+                }
+            </MudStack>
+        }
+
+        @if (_error is not null) { <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert> }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())" Disabled="_busy">İptal</MudButton>
+        @if (_step > 0) { <MudButton OnClick="Prev" Disabled="_busy">← Geri</MudButton> }
+        @if (_step < 3)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Info" OnClick="Next" Disabled="_busy">
+                İleri →
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SaveAsync" Disabled="_busy">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Oluştur
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private int _step;
+    private string _name = "", _slug = "", _city = "", _address = "";
+    private DateTime? _contractStart = DateTime.Today, _contractEnd;
+    private decimal _fee;
+    private decimal? _monthlyFee;
+    private List<WizardBlock> _blocks = [];
+    private List<ManagerLookupDto> _managers = [];
+    private string? _error;
+    private bool _busy;
+
+    private class WizardBlock
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public int FloorCount { get; set; } = 4;
+        public int UnitsPerFloor { get; set; } = 3;
+        public string? ManagerUserId { get; set; }
+        public string? ManagerDisplayName { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        AddBlock();
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var firmSlug = auth.User.FindFirst("firm_slug")?.Value ?? "";
+        _managers = await StaffService.GetManagersByFirmAsync(firmSlug);
+    }
+
+    private void AddBlock() => _blocks.Add(new WizardBlock
+    {
+        Code = ((char)('A' + _blocks.Count)).ToString(),
+        Name = $"{(char)('A' + _blocks.Count)} Blok"
+    });
+
+    private async Task Next()
+    {
+        _error = null;
+        if (_step == 0 && (string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_slug)))
+        { _error = "Ad ve kısa ad zorunludur."; return; }
+        if (_step == 1 && (_blocks.Count == 0 || _blocks.Any(b => string.IsNullOrWhiteSpace(b.Code))))
+        { _error = "En az bir blok ve her bloğun kodu zorunludur."; return; }
+        _step++;
+        if (_step == 2)
+            _monthlyFee = await ObligationService.CalculateMonthlyAsync(_blocks.Sum(b => b.FloorCount * b.UnitsPerFloor));
+    }
+
+    private void Prev() { _error = null; _step--; }
+
+    private async Task SaveAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            var companies = await CompanyService.GetForUserAsync(userId);
+            var company = companies.FirstOrDefault() ?? throw new InvalidOperationException("Firma bulunamadı.");
+
+            var totalUnits = _blocks.Sum(b => b.FloorCount * b.UnitsPerFloor);
+            var cmd = new SiteCommand(company.Id, _name.Trim(), _slug.Trim().ToLower(),
+                _address, _city, totalUnits,
+                _contractStart.HasValue ? DateOnly.FromDateTime(_contractStart.Value) : null,
+                _contractEnd.HasValue ? DateOnly.FromDateTime(_contractEnd.Value) : null,
+                _fee > 0 ? _fee : null, null, SiteType.Site);
+
+            var site = await SiteService.CreateAsync(cmd);
+
+            // Blokları oluştur ve daireleri üret
+            var genConfigs = new List<BlockGenConfig>();
+            foreach (var b in _blocks)
+            {
+                var blokDto = await ResidentService.AddBlockAsync(site.DbFilePath,
+                    new SiteBlockCommand(b.Name, b.Code, b.FloorCount, b.FloorCount * b.UnitsPerFloor));
+                genConfigs.Add(new BlockGenConfig(b.Code, b.Name, blokDto.Id, b.FloorCount, b.UnitsPerFloor));
+
+                // Yetkili ataması
+                if (b.ManagerUserId is not null)
+                {
+                    var managerName = _managers.FirstOrDefault(m => m.Id == b.ManagerUserId)?.DisplayName ?? "";
+                    await ResidentService.AddBlockAssignmentAsync(site.DbFilePath, blokDto.Id,
+                        new BlockAssignmentCommand(b.ManagerUserId, managerName, DateOnly.FromDateTime(DateTime.Today)));
+                }
+            }
+            var count = await ResidentService.GenerateUnitsAsync(site.DbFilePath, genConfigs);
+
+            var firmSlug = auth.User.FindFirst("firm_slug")?.Value ?? company.Id.ToString();
+            await ObligationService.CreateObligationAsync(site.Id, site.Name, SiteType.Site, firmSlug, count, _blocks.Count, 0);
+
+            Snackbar.Add($"{site.Name} oluşturuldu — {count} daire eklendi.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(site.Id));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

@@ -25,13 +25,28 @@ public static class DbSeeder
     {
         await db.Database.MigrateAsync();
 
-        foreach (var role in new[] { "SuperAdmin", "Manager", "SiteStaff", "Auditor", "Resident" })
+        foreach (var role in new[] { "SuperAdmin", "Manager", "SiteStaff", "Auditor", "Accountant", "Resident" })
             if (!await roleMgr.RoleExistsAsync(role))
                 await roleMgr.CreateAsync(new IdentityRole(role));
 
-        await EnsureUser(userManager, "admin@ay.com", "Admin1234!", "Sistem Yöneticisi", null, ["SuperAdmin", "Manager"]);
+        await EnsureUser(userManager, "admin@ay.com", "Admin1234!", "Sistem Yöneticisi", null, ["SuperAdmin"]);
+        // Manager rolü SuperAdmin'e verilmemeli — varsa temizle
+        var adminUser = await userManager.FindByEmailAsync("admin@ay.com");
+        if (adminUser != null && await userManager.IsInRoleAsync(adminUser, "Manager"))
+            await userManager.RemoveFromRoleAsync(adminUser, "Manager");
 
-        if (await db.FirmRegistrations.AnyAsync()) return;
+        await SeedPackages(db);
+        await SeedBillingConfig(db);
+        await SeedBillingTiers(db);
+
+        if (await db.FirmRegistrations.AnyAsync())
+        {
+            await MigrateExistingFirmDbsAsync(db, firmFactory);
+            await SeedMissingSubscriptions(db);
+            await SeedMissingObligations(db, firmFactory);
+            await SeedMissingStaffDataAsync(db, userManager, firmFactory);
+            return;
+        }
 
         // ── FİRMA 1: Özgür Yönetim ───────────────────────────────────────────
         var ozgurReg = await EnsureAndSeedFirm(
@@ -52,13 +67,27 @@ public static class DbSeeder
 
         await using (var firmDb = firmFactory.Create(ozgurReg.DbFilePath))
         {
+            var company = await firmDb.Companies.FirstAsync();
+
+            // CompanyStaff kayıtları (yoksa oluştur)
+            if (!await firmDb.CompanyStaff.AnyAsync(s => s.UserId == siteStaff.Id))
+                firmDb.CompanyStaff.Add(new CompanyStaff { CompanyId = company.Id, UserId = siteStaff.Id, Role = StaffRole.SiteManager, IsActive = true });
+            if (!await firmDb.CompanyStaff.AnyAsync(s => s.UserId == auditor.Id))
+                firmDb.CompanyStaff.Add(new CompanyStaff { CompanyId = company.Id, UserId = auditor.Id, Role = StaffRole.Auditor, IsActive = true });
+            await firmDb.SaveChangesAsync();
+
+            var staffRecord   = await firmDb.CompanyStaff.FirstAsync(s => s.UserId == siteStaff.Id);
+            var auditorRecord = await firmDb.CompanyStaff.FirstAsync(s => s.UserId == auditor.Id);
+
             foreach (var slug in new[] { "lale-apartmani", "gunes-sitesi" })
             {
                 var s = await firmDb.Sites.FirstOrDefaultAsync(x => x.Slug == slug);
                 if (s is null) continue;
-                foreach (var userId in new[] { siteStaff.Id, auditor.Id })
-                    if (!await firmDb.UserSiteAccess.AnyAsync(u => u.UserId == userId && u.SiteId == s.Id))
-                        firmDb.UserSiteAccess.Add(new UserSiteAccess { UserId = userId, SiteId = s.Id });
+                foreach (var staffEntry in new[] { staffRecord, auditorRecord })
+                {
+                    if (!await firmDb.SiteStaffAssignments.AnyAsync(a => a.StaffId == staffEntry.Id && a.SiteId == s.Id && a.RemovedAt == null))
+                        firmDb.SiteStaffAssignments.Add(new SiteStaffAssignment { StaffId = staffEntry.Id, SiteId = s.Id });
+                }
             }
             await firmDb.SaveChangesAsync();
 
@@ -81,6 +110,20 @@ public static class DbSeeder
             }
         }
 
+        // Özgür Yönetim aboneliği — Küçük paketi (2-5 site), 2 sitesi var
+        var kucukPkg = await db.FirmPackages.FirstAsync(p => p.Name == "Küçük");
+        if (!await db.FirmSubscriptions.AnyAsync(s => s.FirmSlug == "ozgur-yonetim"))
+        {
+            db.FirmSubscriptions.Add(new FirmSubscription
+            {
+                FirmSlug = "ozgur-yonetim", FirmPackageId = kucukPkg.Id,
+                ContractStartDate = new DateOnly(2025, 1, 1), ContractEndDate = new DateOnly(2025, 12, 31),
+                Status = SubscriptionStatus.Active, LastModifiedBy = "admin@ay.com", LastModifiedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            await SeedPaymentHistory(db, "ozgur-yonetim", kucukPkg.MonthlyPrice, 2025, 1, 2026, 6);
+        }
+
         // ── FİRMA 2: Sevgi Yönetim ───────────────────────────────────────────
         await EnsureAndSeedFirm(
             db, userManager, firmFactory, siteFactory,
@@ -94,6 +137,23 @@ public static class DbSeeder
                 await SeedBaharSitesi(firmDb, siteFactory);
                 await SeedPrestijTopluYapi(firmDb, siteFactory);
             });
+
+        // Sevgi Yönetim aboneliği — Küçük paketi, 2 sitesi var
+        if (!await db.FirmSubscriptions.AnyAsync(s => s.FirmSlug == "sevgi-yonetim"))
+        {
+            db.FirmSubscriptions.Add(new FirmSubscription
+            {
+                FirmSlug = "sevgi-yonetim", FirmPackageId = kucukPkg.Id,
+                ContractStartDate = new DateOnly(2024, 6, 1), ContractEndDate = new DateOnly(2025, 5, 31),
+                Status = SubscriptionStatus.Overdue,
+                Notes = "Sözleşme yenileme görüşmeleri devam ediyor.",
+                LastModifiedBy = "admin@ay.com", LastModifiedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            await SeedPaymentHistory(db, "sevgi-yonetim", kucukPkg.MonthlyPrice, 2024, 6, 2026, 6, overdueFromMonth: (2026, 4));
+        }
+
+        await SeedMissingObligations(db, firmFactory);
     }
 
     private static async Task<FirmRegistration> EnsureAndSeedFirm(
@@ -110,7 +170,12 @@ public static class DbSeeder
         await using var firmDb = await firmFactory.CreateAndMigrateAsync(slug);
         if (!await firmDb.Companies.AnyAsync())
         {
-            firmDb.Companies.Add(new ManagementCompany { Name = name, Slug = slug, Email = $"info@{slug.Replace("-", "")}.com" });
+            firmDb.Companies.Add(new ManagementCompany
+            {
+                Name = name, Slug = slug,
+                Email = $"info@{slug.Replace("-", "")}.com",
+                ContactPerson = managerDisplayName
+            });
             await firmDb.SaveChangesAsync();
         }
         await EnsureUser(userManager, managerEmail, managerPassword, managerDisplayName, slug, ["Manager"]);
@@ -125,13 +190,20 @@ public static class DbSeeder
     {
         const string slug = "lale-apartmani";
         var dbPath = Path.Combine("data", "sites", $"{slug}.db");
-        firmDb.Sites.Add(new SiteProfile
+        var laleCompanyId = (await firmDb.Companies.FirstAsync()).Id;
+        var laleSiteProfile = new SiteProfile
         {
-            CompanyId = (await firmDb.Companies.FirstAsync()).Id,
+            CompanyId = laleCompanyId,
             Name = "Lale Apartmanı", Slug = slug, SiteType = SiteType.Apartman,
-            Address = "Lale Sokak No:5, Bağcılar", City = "İstanbul", UnitCount = 12, DbFilePath = dbPath,
-            ContractStartDate = new DateOnly(2021, 1, 1), ContractEndDate = new DateOnly(2024, 12, 31),
-            MonthlyManagementFee = 3200, ContractNotes = "2 yıllık sözleşme. Yıllık enflasyon farkı uygulanır."
+            Address = "Lale Sokak No:5, Bağcılar", City = "İstanbul", UnitCount = 12, DbFilePath = dbPath
+        };
+        firmDb.Sites.Add(laleSiteProfile);
+        await firmDb.SaveChangesAsync();
+        firmDb.SiteContracts.Add(new SiteContract
+        {
+            SiteId = laleSiteProfile.Id, StartDate = new DateOnly(2021, 1, 1), EndDate = new DateOnly(2024, 12, 31),
+            MonthlyFee = 3200, Notes = "2 yıllık sözleşme. Yıllık enflasyon farkı uygulanır.",
+            Status = ContractStatus.Active, Scope = ContractScope.Tumu, FeeType = ManagementFeeType.Fixed
         });
         await firmDb.SaveChangesAsync();
 
@@ -171,13 +243,20 @@ public static class DbSeeder
     {
         const string slug = "gunes-sitesi";
         var dbPath = Path.Combine("data", "sites", $"{slug}.db");
-        firmDb.Sites.Add(new SiteProfile
+        var gunesCompanyId = (await firmDb.Companies.FirstAsync()).Id;
+        var gunesSiteProfile = new SiteProfile
         {
-            CompanyId = (await firmDb.Companies.FirstAsync()).Id,
+            CompanyId = gunesCompanyId,
             Name = "Güneş Sitesi", Slug = slug, SiteType = SiteType.Site,
-            Address = "Güneş Bulvarı No:12, Çankaya", City = "Ankara", UnitCount = 24, DbFilePath = dbPath,
-            ContractStartDate = new DateOnly(2022, 6, 1), ContractEndDate = new DateOnly(2025, 5, 31),
-            MonthlyManagementFee = 5800, ContractNotes = "3 yıllık sözleşme. Güvenlik ve temizlik hizmetleri dahildir."
+            Address = "Güneş Bulvarı No:12, Çankaya", City = "Ankara", UnitCount = 24, DbFilePath = dbPath
+        };
+        firmDb.Sites.Add(gunesSiteProfile);
+        await firmDb.SaveChangesAsync();
+        firmDb.SiteContracts.Add(new SiteContract
+        {
+            SiteId = gunesSiteProfile.Id, StartDate = new DateOnly(2022, 6, 1), EndDate = new DateOnly(2025, 5, 31),
+            MonthlyFee = 5800, Notes = "3 yıllık sözleşme. Güvenlik ve temizlik hizmetleri dahildir.",
+            Status = ContractStatus.Active, Scope = ContractScope.Tumu, FeeType = ManagementFeeType.Fixed
         });
         await firmDb.SaveChangesAsync();
 
@@ -218,13 +297,20 @@ public static class DbSeeder
     {
         const string slug = "bahar-sitesi";
         var dbPath = Path.Combine("data", "sites", $"{slug}.db");
-        firmDb.Sites.Add(new SiteProfile
+        var baharCompanyId = (await firmDb.Companies.FirstAsync()).Id;
+        var baharSiteProfile = new SiteProfile
         {
-            CompanyId = (await firmDb.Companies.FirstAsync()).Id,
+            CompanyId = baharCompanyId,
             Name = "Bahar Sitesi", Slug = slug, SiteType = SiteType.Site,
-            Address = "Bahar Sokak No:8, Kadıköy", City = "İstanbul", UnitCount = 36, DbFilePath = dbPath,
-            ContractStartDate = new DateOnly(2023, 1, 1), ContractEndDate = new DateOnly(2025, 12, 31),
-            MonthlyManagementFee = 8500, ContractNotes = "2 yıllık yönetim sözleşmesi. Yıllık TÜFE+5 artış hakkı mevcuttur."
+            Address = "Bahar Sokak No:8, Kadıköy", City = "İstanbul", UnitCount = 36, DbFilePath = dbPath
+        };
+        firmDb.Sites.Add(baharSiteProfile);
+        await firmDb.SaveChangesAsync();
+        firmDb.SiteContracts.Add(new SiteContract
+        {
+            SiteId = baharSiteProfile.Id, StartDate = new DateOnly(2023, 1, 1), EndDate = new DateOnly(2025, 12, 31),
+            MonthlyFee = 8500, Notes = "2 yıllık yönetim sözleşmesi. Yıllık TÜFE+5 artış hakkı mevcuttur.",
+            Status = ContractStatus.Active, Scope = ContractScope.Tumu, FeeType = ManagementFeeType.Fixed
         });
         await firmDb.SaveChangesAsync();
 
@@ -265,13 +351,20 @@ public static class DbSeeder
     {
         const string slug = "prestij-toplu-yapi";
         var dbPath = Path.Combine("data", "sites", $"{slug}.db");
-        firmDb.Sites.Add(new SiteProfile
+        var prestijCompanyId = (await firmDb.Companies.FirstAsync()).Id;
+        var prestijSiteProfile = new SiteProfile
         {
-            CompanyId = (await firmDb.Companies.FirstAsync()).Id,
+            CompanyId = prestijCompanyId,
             Name = "Prestij Toplu Yapı", Slug = slug, SiteType = SiteType.TopluYapi,
-            Address = "Prestij Caddesi No:200, Ataşehir", City = "İstanbul", UnitCount = 80, DbFilePath = dbPath,
-            ContractStartDate = new DateOnly(2022, 6, 1), ContractEndDate = new DateOnly(2027, 5, 31),
-            MonthlyManagementFee = 35000, ContractNotes = "5 yıllık premium yönetim sözleşmesi. 7/24 güvenlik ve teknik ekip dahildir."
+            Address = "Prestij Caddesi No:200, Ataşehir", City = "İstanbul", UnitCount = 80, DbFilePath = dbPath
+        };
+        firmDb.Sites.Add(prestijSiteProfile);
+        await firmDb.SaveChangesAsync();
+        firmDb.SiteContracts.Add(new SiteContract
+        {
+            SiteId = prestijSiteProfile.Id, StartDate = new DateOnly(2022, 6, 1), EndDate = new DateOnly(2027, 5, 31),
+            MonthlyFee = 35000, Notes = "5 yıllık premium yönetim sözleşmesi. 7/24 güvenlik ve teknik ekip dahildir.",
+            Status = ContractStatus.Active, Scope = ContractScope.Tumu, FeeType = ManagementFeeType.Fixed
         });
         await firmDb.SaveChangesAsync();
 
@@ -326,6 +419,226 @@ public static class DbSeeder
         await AddMaintenance(sdb, units, new Random(303));
         await AddMeetings(sdb, "Prestij Toplu Yapı Yönetimi", "Prestij Toplu Yapı", 3000);
         await AddAccounting(sdb, 3000 * 56 + 5000 * 4 + 500 * 8, 2026, 3, 2026, 5, "Prestij Toplu Yapı Yönetimi", new Random(303));
+    }
+
+    // ─── PAKET & ABONELİK HELPERS ────────────────────────────────────────────
+
+    private static async Task SeedMissingSubscriptions(MainDbContext db)
+    {
+        var kucukPkg = await db.FirmPackages.FirstOrDefaultAsync(p => p.Name == "Küçük");
+        if (kucukPkg is null) return;
+
+        if (!await db.FirmSubscriptions.AnyAsync(s => s.FirmSlug == "ozgur-yonetim"))
+        {
+            db.FirmSubscriptions.Add(new FirmSubscription
+            {
+                FirmSlug = "ozgur-yonetim", FirmPackageId = kucukPkg.Id,
+                ContractStartDate = new DateOnly(2025, 1, 1), ContractEndDate = new DateOnly(2025, 12, 31),
+                Status = SubscriptionStatus.Active, LastModifiedBy = "admin@ay.com", LastModifiedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            await SeedPaymentHistory(db, "ozgur-yonetim", kucukPkg.MonthlyPrice, 2025, 1, 2026, 6);
+        }
+
+        if (!await db.FirmSubscriptions.AnyAsync(s => s.FirmSlug == "sevgi-yonetim"))
+        {
+            db.FirmSubscriptions.Add(new FirmSubscription
+            {
+                FirmSlug = "sevgi-yonetim", FirmPackageId = kucukPkg.Id,
+                ContractStartDate = new DateOnly(2024, 6, 1), ContractEndDate = new DateOnly(2025, 5, 31),
+                Status = SubscriptionStatus.Overdue,
+                Notes = "Sözleşme yenileme görüşmeleri devam ediyor.",
+                LastModifiedBy = "admin@ay.com", LastModifiedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+            await SeedPaymentHistory(db, "sevgi-yonetim", kucukPkg.MonthlyPrice, 2024, 6, 2026, 6, overdueFromMonth: (2026, 4));
+        }
+    }
+
+    private static async Task SeedPackages(MainDbContext db)
+    {
+        if (await db.FirmPackages.AnyAsync()) return;
+        var packages = new[]
+        {
+            new FirmPackage { Name = "Solo",      MinSiteCount = 1,  MaxSiteCount = 1,  MonthlyPrice =   399m, DisplayOrder = 1 },
+            new FirmPackage { Name = "Küçük",     MinSiteCount = 2,  MaxSiteCount = 5,  MonthlyPrice =   999m, DisplayOrder = 2 },
+            new FirmPackage { Name = "Orta",      MinSiteCount = 6,  MaxSiteCount = 15, MonthlyPrice =  2499m, DisplayOrder = 3 },
+            new FirmPackage { Name = "Büyük",     MinSiteCount = 16, MaxSiteCount = 30, MonthlyPrice =  4999m, DisplayOrder = 4 },
+            new FirmPackage { Name = "Kurumsal",  MinSiteCount = 31, MaxSiteCount = 50, MonthlyPrice =  8999m, DisplayOrder = 5 },
+            new FirmPackage { Name = "Enterprise",MinSiteCount = 51, MaxSiteCount = null, MonthlyPrice = 0m,   DisplayOrder = 6 },
+        };
+        db.FirmPackages.AddRange(packages);
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedBillingTiers(MainDbContext db)
+    {
+        if (await db.SiteBillingTiers.AnyAsync()) return;
+        db.SiteBillingTiers.AddRange(
+            new SiteBillingTier { MinDaire = 1,    MaxDaire = 40,   MonthlyAmount = 500m,  DisplayOrder = 1 },
+            new SiteBillingTier { MinDaire = 41,   MaxDaire = 100,  MonthlyAmount = 1000m, DisplayOrder = 2 },
+            new SiteBillingTier { MinDaire = 101,  MaxDaire = 200,  MonthlyAmount = 2000m, DisplayOrder = 3 },
+            new SiteBillingTier { MinDaire = 201,  MaxDaire = 3000, MonthlyAmount = 2500m, DisplayOrder = 4 },
+            new SiteBillingTier { MinDaire = 3001, MaxDaire = null, MonthlyAmount = 3000m, DisplayOrder = 5 }
+        );
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedBillingConfig(MainDbContext db)
+    {
+        if (await db.SiteBillingConfigs.AnyAsync()) return;
+        db.SiteBillingConfigs.Add(new SiteBillingConfig
+        {
+            Id = 1, PricePerDaire = 15m, PricePerBlok = 50m, PricePerKisim = 100m,
+            MinimumMonthly = 100m, DefaultPeriod = BillingPeriod.Monthly,
+            UpdatedBy = "system"
+        });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task MigrateExistingFirmDbsAsync(MainDbContext db, FirmDbContextFactory firmFactory)
+    {
+        var firms = await db.FirmRegistrations.ToListAsync();
+        foreach (var firm in firms)
+        {
+            try
+            {
+                await using var firmDb = firmFactory.CreateBySlug(firm.Slug);
+                await firmDb.Database.MigrateAsync();
+            }
+            catch { /* firma DB yoksa veya erişilemiyorsa atla */ }
+        }
+    }
+
+    private static async Task SeedMissingStaffDataAsync(MainDbContext db, UserManager<AppUser> userManager, FirmDbContextFactory firmFactory)
+    {
+        var firms = await db.FirmRegistrations.ToListAsync();
+        foreach (var firm in firms)
+        {
+            try
+            {
+                await using var firmDb = firmFactory.CreateBySlug(firm.Slug);
+                var company = await firmDb.Companies.FirstOrDefaultAsync();
+                if (company is null) continue;
+
+                // CompanyStaff kaydı olmayanlar için oluştur
+                var firmUsers = await userManager.Users.Where(u => u.FirmSlug == firm.Slug).ToListAsync();
+                foreach (var user in firmUsers)
+                {
+                    var roles = await userManager.GetRolesAsync(user);
+                    // Manager (SiteAdmin) için CompanyStaff oluşturma — onlar firma sahibi
+                    if (roles.Contains("Manager")) continue;
+
+                    if (await firmDb.CompanyStaff.AnyAsync(s => s.UserId == user.Id)) continue;
+
+                    StaffRole role = roles.Contains("Auditor") ? StaffRole.Auditor
+                        : roles.Contains("Accountant") ? StaffRole.Accountant
+                        : StaffRole.SiteManager;
+
+                    firmDb.CompanyStaff.Add(new CompanyStaff
+                    {
+                        CompanyId = company.Id, UserId = user.Id,
+                        Role = role, IsActive = true
+                    });
+                }
+                await firmDb.SaveChangesAsync();
+            }
+            catch { /* firma DB yoksa atla */ }
+        }
+    }
+
+    private static async Task SeedMissingObligations(MainDbContext db, FirmDbContextFactory firmFactory)
+    {
+        var cfg = await db.SiteBillingConfigs.FirstOrDefaultAsync() ?? new SiteBillingConfig();
+        var firms = await db.FirmRegistrations.ToListAsync();
+
+        foreach (var firm in firms)
+        {
+            try
+            {
+                await using var firmDb = firmFactory.Create(firm.DbFilePath);
+                var sites = await firmDb.Sites.Where(s => s.IsActive).ToListAsync();
+                foreach (var site in sites)
+                {
+                    if (await db.SiteObligations.AnyAsync(o => o.SiteId == site.Id)) continue;
+
+                    int blokCount = 0, kisimCount = 0;
+                    decimal monthly = Math.Max(site.UnitCount * cfg.PricePerDaire, cfg.MinimumMonthly);
+
+                    if (site.SiteType != SiteType.Apartman && System.IO.File.Exists(site.DbFilePath))
+                    {
+                        try
+                        {
+                            var siteOpts = new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<SiteDbContext>()
+                                .UseSqlite($"DataSource={site.DbFilePath};Cache=Shared")
+                                .Options;
+                            await using var siteDb = new SiteDbContext(siteOpts);
+                            blokCount = await siteDb.Blocks.CountAsync();
+                            kisimCount = await siteDb.Kisimlar.CountAsync();
+                        }
+                        catch { }
+                        monthly = site.SiteType switch
+                        {
+                            SiteType.Site => Math.Max(site.UnitCount * cfg.PricePerDaire + blokCount * cfg.PricePerBlok, cfg.MinimumMonthly),
+                            SiteType.TopluYapi => Math.Max(site.UnitCount * cfg.PricePerDaire + blokCount * cfg.PricePerBlok + kisimCount * cfg.PricePerKisim, cfg.MinimumMonthly),
+                            _ => monthly
+                        };
+                    }
+
+                    db.SiteObligations.Add(new SiteObligation
+                    {
+                        FirmSlug = firm.Slug,
+                        SiteId = site.Id,
+                        SiteName = site.Name,
+                        SiteType = site.SiteType,
+                        DaireCount = site.UnitCount,
+                        BlokCount = blokCount,
+                        KisimCount = kisimCount,
+                        MonthlyAmount = monthly,
+                        BillingPeriod = cfg.DefaultPeriod,
+                        PricePerDaire = cfg.PricePerDaire,
+                        PricePerBlok = cfg.PricePerBlok,
+                        PricePerKisim = cfg.PricePerKisim,
+                    });
+                }
+                await db.SaveChangesAsync();
+            }
+            catch { /* FirmDB erişilemiyor ise atla */ }
+        }
+    }
+
+    private static async Task SeedPaymentHistory(MainDbContext db, string firmSlug, decimal amount,
+        int fromYear, int fromMonth, int toYear, int toMonth,
+        (int year, int month)? overdueFromMonth = null)
+    {
+        var rnd = new Random(firmSlug.GetHashCode());
+        var (cy, cm) = (fromYear, fromMonth);
+        while (cy < toYear || (cy == toYear && cm <= toMonth))
+        {
+            var dueDate = new DateOnly(cy, cm, 5);
+            var isOverdue = overdueFromMonth.HasValue &&
+                (cy > overdueFromMonth.Value.year || (cy == overdueFromMonth.Value.year && cm >= overdueFromMonth.Value.month));
+            var isFuture = new DateOnly(cy, cm, 1) > new DateOnly(2026, 6, 1);
+            PaymentRecordStatus status;
+            DateOnly? paymentDate = null;
+            decimal paid;
+            if (isFuture) { status = PaymentRecordStatus.Pending; paid = 0; }
+            else if (isOverdue) { status = PaymentRecordStatus.Overdue; paid = 0; }
+            else
+            {
+                var r = rnd.NextDouble();
+                if (r > 0.1) { status = PaymentRecordStatus.Paid; paid = amount; paymentDate = dueDate.AddDays(rnd.Next(0, 8)); }
+                else { status = PaymentRecordStatus.Partial; paid = amount / 2; }
+            }
+            db.FirmPaymentRecords.Add(new FirmPaymentRecord
+            {
+                FirmSlug = firmSlug, PeriodYear = cy, PeriodMonth = cm,
+                AmountDue = amount, AmountPaid = paid,
+                DueDate = dueDate, PaymentDate = paymentDate, PaymentStatus = status
+            });
+            if (cm == 12) { cy++; cm = 1; } else cm++;
+        }
+        await db.SaveChangesAsync();
     }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────

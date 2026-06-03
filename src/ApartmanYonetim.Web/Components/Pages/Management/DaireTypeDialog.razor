@@ -1,0 +1,137 @@
+@inject ISiteResidentService ResidentService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Daire Tipleri</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Varsayılan tipler (1+0 – 4+1) silinemez. Yeni tip ekleyebilir veya mevcut isimleri düzenleyebilirsiniz.
+            </MudAlert>
+
+            <!-- Mevcut tipler -->
+            @foreach (var dt in _types)
+            {
+                var d = dt;
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    @if (_editId == d.Id)
+                    {
+                        <MudTextField @bind-Value="_editName" Variant="Variant.Outlined"
+                                      Margin="Margin.Dense" Style="flex:1" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success"
+                                       Size="Size.Small" OnClick="@(() => SaveEdit(d.Id, d.DisplayOrder))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Default"
+                                       Size="Size.Small" OnClick="@(() => _editId = Guid.Empty)" />
+                    }
+                    else
+                    {
+                        <MudChip T="string" Color="@(d.IsDefault ? Color.Primary : Color.Default)"
+                                 Size="Size.Medium" Style="flex:1;justify-content:flex-start">
+                            @d.Name @(d.IsDefault ? "(varsayılan)" : "")
+                        </MudChip>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       Color="Color.Primary" OnClick="@(() => StartEdit(d))" />
+                        @if (!d.IsDefault)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           Color="Color.Error" OnClick="@(() => DeleteAsync(d.Id))" />
+                        }
+                    }
+                </MudStack>
+            }
+
+            <MudDivider />
+
+            <!-- Yeni tip ekle -->
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudTextField @bind-Value="_newName" Label="Yeni Tip" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Style="flex:1"
+                              HelperText="Örn: 5+1, Dubleks, Çatı Katı"
+                              @onkeydown="@(async e => { if (e.Key == "Enter") await AddAsync(); })" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddAsync" Disabled="_busy">
+                    Ekle
+                </MudButton>
+            </MudStack>
+
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="@(() => MudDialog.Close(DialogResult.Ok(true)))">
+            Kapat
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string DbFilePath { get; set; } = "";
+
+    private List<DaireTypeDto> _types = [];
+    private string _newName = "";
+    private Guid _editId = Guid.Empty;
+    private string _editName = "";
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ResidentService.EnsureDefaultDaireTypesAsync(DbFilePath);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _types = await ResidentService.GetDaireTypesAsync(DbFilePath);
+        StateHasChanged();
+    }
+
+    private void StartEdit(DaireTypeDto d)
+    {
+        _editId = d.Id; _editName = d.Name; _error = null;
+    }
+
+    private async Task SaveEdit(Guid id, int order)
+    {
+        if (string.IsNullOrWhiteSpace(_editName)) { _error = "Ad boş olamaz."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            await ResidentService.UpdateDaireTypeAsync(DbFilePath, id, new DaireTypeCommand(_editName.Trim(), order));
+            _editId = Guid.Empty;
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task AddAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+        _busy = true; _error = null;
+        try
+        {
+            var order = _types.Count > 0 ? _types.Max(t => t.DisplayOrder) + 1 : 10;
+            await ResidentService.AddDaireTypeAsync(DbFilePath, new DaireTypeCommand(_newName.Trim(), order));
+            _newName = "";
+            await LoadAsync();
+            Snackbar.Add("Daire tipi eklendi.", Severity.Success);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        _busy = true; _error = null;
+        try
+        {
+            await ResidentService.DeleteDaireTypeAsync(DbFilePath, id);
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

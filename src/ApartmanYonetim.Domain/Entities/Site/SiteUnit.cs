@@ -13,4 +13,6 @@ public class SiteUnit
     public decimal? ArsaPay { get; set; }
     public Guid? BlockId { get; set; }
     public SiteBlock? BlockRef { get; set; }
+    public Guid? DaireTypeId { get; set; }
+    public SiteDaireType? DaireType { get; set; }
 }

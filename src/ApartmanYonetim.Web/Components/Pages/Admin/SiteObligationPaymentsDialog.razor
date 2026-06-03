@@ -1,0 +1,206 @@
+@inject ISiteObligationService ObligationService
+@inject AuthenticationStateProvider AuthProvider
+@inject ISnackbar Snackbar
+
+<MudDialog Style="min-width:700px">
+    <DialogContent>
+        <MudStack Spacing="3">
+            <!-- Özet -->
+            <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center">
+                <MudChip T="string" Color="Color.Primary" Size="Size.Small">@SiteTypeLabel(Obligation.SiteType)</MudChip>
+                <MudText Typo="Typo.body2">
+                    @Obligation.DaireCount daire
+                    @if (Obligation.BlokCount > 0) { <text>, @Obligation.BlokCount blok</text> }
+                    @if (Obligation.KisimCount > 0) { <text>, @Obligation.KisimCount kısım</text> }
+                    &nbsp;→&nbsp;<strong>@Obligation.MonthlyAmount.ToString("N2") ₺/ay</strong>
+                </MudText>
+            </MudStack>
+
+            <!-- Yeni ödeme kaydı oluştur -->
+            <MudExpansionPanels>
+                <MudExpansionPanel Text="Yeni Dönem Kaydı Ekle" Icon="@Icons.Material.Filled.Add">
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_newLabel" Label="Dönem Etiketi" Variant="Variant.Outlined"
+                                          Placeholder="Haziran 2026" />
+                        </MudItem>
+                        <MudItem xs="12" sm="3">
+                            <MudDatePicker @bind-Date="_newStart" Label="Başlangıç" Variant="Variant.Outlined"
+                                           DateFormat="dd.MM.yyyy" Editable="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="3">
+                            <MudDatePicker @bind-Date="_newEnd" Label="Bitiş" Variant="Variant.Outlined"
+                                           DateFormat="dd.MM.yyyy" Editable="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField @bind-Value="_newAmountDue" Label="Borç (₺)" Variant="Variant.Outlined"
+                                             Min="0" Format="N2" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudNumericField @bind-Value="_newAmountPaid" Label="Ödenen (₺)" Variant="Variant.Outlined"
+                                             Min="0" Format="N2" />
+                        </MudItem>
+                        <MudItem xs="12" sm="4">
+                            <MudDatePicker @bind-Date="_newDueDate" Label="Vade" Variant="Variant.Outlined"
+                                           DateFormat="dd.MM.yyyy" Editable="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker @bind-Date="_newPaymentDate" Label="Ödeme Tarihi (opsiyonel)"
+                                           Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" Editable="true"
+                                           Clearable="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect @bind-Value="_newStatus" Label="Durum" Variant="Variant.Outlined">
+                                <MudSelectItem Value="ObligationPaymentStatus.Pending">Bekliyor</MudSelectItem>
+                                <MudSelectItem Value="ObligationPaymentStatus.Paid">Ödendi</MudSelectItem>
+                                <MudSelectItem Value="ObligationPaymentStatus.Partial">Kısmi Ödendi</MudSelectItem>
+                                <MudSelectItem Value="ObligationPaymentStatus.Overdue">Gecikmiş</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_newNotes" Label="Not" Variant="Variant.Outlined" Lines="2" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddPaymentAsync"
+                                       Disabled="_busy">Kaydet</MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+
+            <!-- Mevcut ödemeler -->
+            @if (_payments is null)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (_payments.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">Henüz ödeme kaydı yok.</MudAlert>
+            }
+            else
+            {
+                <MudTable Items="_payments" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Dönem</MudTh>
+                        <MudTh Style="text-align:right">Borç</MudTh>
+                        <MudTh Style="text-align:right">Ödenen</MudTh>
+                        <MudTh>Vade</MudTh>
+                        <MudTh>Ödeme Tar.</MudTh>
+                        <MudTh>Durum</MudTh>
+                        <MudTh>Not</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.PeriodLabel</MudTd>
+                        <MudTd Style="text-align:right">@context.AmountDue.ToString("N2")</MudTd>
+                        <MudTd Style="text-align:right">@context.AmountPaid.ToString("N2")</MudTd>
+                        <MudTd>
+                            <MudText Color="@(context.DueDate < DateOnly.FromDateTime(DateTime.Today) && context.Status != ObligationPaymentStatus.Paid ? Color.Error : Color.Default)">
+                                @context.DueDate.ToString("dd.MM.yyyy")
+                            </MudText>
+                        </MudTd>
+                        <MudTd>@(context.PaymentDate?.ToString("dd.MM.yyyy") ?? "—")</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small" Color="@StatusColor(context.Status)">
+                                @StatusLabel(context.Status)
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>@(context.Notes ?? "")</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeletePaymentAsync(context.Id))" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close())">Kapat</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public SiteObligationDto Obligation { get; set; } = default!;
+
+    private List<ObligationPaymentDto>? _payments;
+    private bool _busy;
+
+    private string _newLabel = "";
+    private DateTime? _newStart, _newEnd, _newDueDate, _newPaymentDate;
+    private decimal _newAmountDue, _newAmountPaid;
+    private ObligationPaymentStatus _newStatus = ObligationPaymentStatus.Pending;
+    private string? _newNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _newAmountDue = Obligation.MonthlyAmount;
+        var today = DateTime.Today;
+        _newStart = new DateTime(today.Year, today.Month, 1);
+        _newEnd = _newStart.Value.AddMonths(1).AddDays(-1);
+        _newDueDate = _newStart.Value.AddDays(14);
+        _newLabel = $"{_newStart.Value:MMMM yyyy}";
+        await LoadPaymentsAsync();
+    }
+
+    private async Task LoadPaymentsAsync()
+    {
+        _payments = await ObligationService.GetPaymentsAsync(Obligation.Id);
+    }
+
+    private async Task AddPaymentAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newLabel) || _newStart is null || _newEnd is null || _newDueDate is null)
+        {
+            Snackbar.Add("Dönem etiketi, başlangıç, bitiş ve vade tarihi zorunludur.", Severity.Warning);
+            return;
+        }
+        _busy = true;
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name ?? "";
+            var cmd = new ObligationPaymentCommand(
+                Obligation.Id, _newLabel,
+                DateOnly.FromDateTime(_newStart.Value), DateOnly.FromDateTime(_newEnd.Value),
+                _newAmountDue, _newAmountPaid,
+                DateOnly.FromDateTime(_newDueDate.Value),
+                _newPaymentDate.HasValue ? DateOnly.FromDateTime(_newPaymentDate.Value) : null,
+                _newStatus, _newNotes, user);
+            await ObligationService.UpsertPaymentAsync(null, cmd);
+            await LoadPaymentsAsync();
+            Snackbar.Add("Ödeme kaydı eklendi.", Severity.Success);
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task DeletePaymentAsync(int id)
+    {
+        await ObligationService.DeletePaymentAsync(id);
+        await LoadPaymentsAsync();
+        Snackbar.Add("Silindi.", Severity.Info);
+    }
+
+    private static Color StatusColor(ObligationPaymentStatus s) => s switch
+    {
+        ObligationPaymentStatus.Paid => Color.Success,
+        ObligationPaymentStatus.Overdue => Color.Error,
+        ObligationPaymentStatus.Partial => Color.Warning,
+        _ => Color.Default
+    };
+    private static string StatusLabel(ObligationPaymentStatus s) => s switch
+    {
+        ObligationPaymentStatus.Paid => "Ödendi",
+        ObligationPaymentStatus.Overdue => "Gecikmiş",
+        ObligationPaymentStatus.Partial => "Kısmi",
+        _ => "Bekliyor"
+    };
+    private static string SiteTypeLabel(SiteType t) => t switch
+    {
+        SiteType.Apartman => "Apartman",
+        SiteType.TopluYapi => "Toplu Yapı",
+        _ => "Site"
+    };
+}

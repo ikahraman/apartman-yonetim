@@ -1,0 +1,114 @@
+@page "/admin/paketler"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IFirmSubscriptionService SubService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Abonelik Paketleri</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h5" Style="font-weight:700">Abonelik Paketleri</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">
+            Yeni Paket
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudTable Items="_packages" Hover="true" Striped="true" Elevation="2">
+            <HeaderContent>
+                <MudTh>Sıra</MudTh>
+                <MudTh>Paket Adı</MudTh>
+                <MudTh>Site Aralığı</MudTh>
+                <MudTh>Aylık Ücret</MudTh>
+                <MudTh>Durum</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.DisplayOrder</MudTd>
+                <MudTd><MudText Style="font-weight:600">@context.Name</MudText></MudTd>
+                <MudTd>
+                    @if (context.MaxSiteCount is null)
+                    {
+                        <MudText>@context.MinSiteCount+ site</MudText>
+                    }
+                    else if (context.MinSiteCount == context.MaxSiteCount)
+                    {
+                        <MudText>@context.MinSiteCount site</MudText>
+                    }
+                    else
+                    {
+                        <MudText>@context.MinSiteCount – @context.MaxSiteCount site</MudText>
+                    }
+                </MudTd>
+                <MudTd>
+                    @if (context.MonthlyPrice == 0)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary">Özel Fiyat</MudChip>
+                    }
+                    else
+                    {
+                        <MudText Style="font-weight:600">@context.MonthlyPrice.ToString("N0") ₺</MudText>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.IsActive ? Color.Success : Color.Default)"
+                             Variant="Variant.Filled">
+                        @(context.IsActive ? "Aktif" : "Pasif")
+                    </MudChip>
+                </MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       Color="Color.Primary" OnClick="() => OpenEditDialog(context)" />
+                        <MudIconButton Icon="@(context.IsActive ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                       Size="Size.Small" Color="@(context.IsActive ? Color.Default : Color.Success)"
+                                       Title="@(context.IsActive ? "Pasif yap" : "Aktif yap")"
+                                       OnClick="() => ToggleActive(context)" />
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    private List<PackageDto> _packages = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _packages = await SubService.GetPackagesAsync();
+        _loading = false;
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dialog = await DialogService.ShowAsync<PackageFormDialog>("Yeni Paket",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await OnInitializedAsync();
+    }
+
+    private async Task OpenEditDialog(PackageDto pkg)
+    {
+        var p = new DialogParameters<PackageFormDialog> { { x => x.Package, pkg } };
+        var dialog = await DialogService.ShowAsync<PackageFormDialog>("Paketi Düzenle", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await dialog.Result)!.Canceled) await OnInitializedAsync();
+    }
+
+    private async Task ToggleActive(PackageDto pkg)
+    {
+        await SubService.SetPackageActiveAsync(pkg.Id, !pkg.IsActive);
+        Snackbar.Add(pkg.IsActive ? "Paket pasif yapıldı." : "Paket aktif edildi.", Severity.Success);
+        await OnInitializedAsync();
+    }
+}

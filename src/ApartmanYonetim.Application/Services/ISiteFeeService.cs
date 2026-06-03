@@ -1,9 +1,9 @@
 using ApartmanYonetim.Domain.Enums;
 namespace ApartmanYonetim.Application.Services;
 
-public record FeeScheduleDto(Guid Id, string Name, decimal Amount, FeePeriod Period, int DueDay, DateOnly StartDate, DateOnly? EndDate, bool IsActive, DistributionType DistributionType = DistributionType.EsitPay, UnitType? AppliesToUnitType = null);
+public record FeeScheduleDto(Guid Id, string Name, decimal Amount, FeePeriod Period, int DueDay, DateOnly StartDate, DateOnly? EndDate, bool IsActive, DistributionType DistributionType = DistributionType.EsitPay, UnitType? AppliesToUnitType = null, Guid? AppliesToDaireTypeId = null, string? AppliesToDaireTypeName = null);
 public record FeePaymentDto(Guid Id, Guid UnitId, string UnitNumber, string? UnitBlock, Guid ScheduleId, string PeriodLabel, DateOnly DueDate, decimal Amount, DateOnly? PaidDate, decimal? PaidAmount, FeePaymentStatus Status, string? Notes);
-public record FeeScheduleCommand(string Name, decimal Amount, FeePeriod Period, int DueDay, DateOnly StartDate, DateOnly? EndDate, DistributionType DistributionType = DistributionType.EsitPay, UnitType? AppliesToUnitType = null);
+public record FeeScheduleCommand(string Name, decimal Amount, FeePeriod Period, int DueDay, DateOnly StartDate, DateOnly? EndDate, DistributionType DistributionType = DistributionType.EsitPay, UnitType? AppliesToUnitType = null, Guid? AppliesToDaireTypeId = null);
 
 public interface ISiteFeeService
 {
