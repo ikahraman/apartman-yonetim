@@ -53,6 +53,7 @@ builder.Services.AddIdentityCore<AppUser>(options =>
         options.Password.RequireDigit = true;
         options.Password.RequireUppercase = true;
         options.Password.RequiredLength = 8;
+        options.Password.RequireNonAlphanumeric = false;
     })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<MainDbContext>()
