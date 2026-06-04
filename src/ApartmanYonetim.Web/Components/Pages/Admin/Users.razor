@@ -205,7 +205,11 @@
     private async Task OpenAddDialog()
     {
         var allRoles = RoleManager.Roles.Select(r => r.Name!).ToList();
-        var p = new DialogParameters<UserFormDialog> { { x => x.AllRoles, allRoles } };
+        var p = new DialogParameters<UserFormDialog>
+        {
+            { x => x.AllRoles, allRoles },
+            { x => x.Firms, _firms }
+        };
         var dialog = await DialogService.ShowAsync<UserFormDialog>("Kullanıcı Ekle", p,
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
         if (!(await dialog.Result)!.Canceled) await Reload();
@@ -218,7 +222,10 @@
         var allRoles = RoleManager.Roles.Select(r => r.Name!).ToList();
         var p = new DialogParameters<UserFormDialog>
         {
-            { x => x.User, user }, { x => x.CurrentRoles, vm.Roles }, { x => x.AllRoles, allRoles }
+            { x => x.User, user },
+            { x => x.CurrentRoles, vm.Roles },
+            { x => x.AllRoles, allRoles },
+            { x => x.Firms, _firms }
         };
         var dialog = await DialogService.ShowAsync<UserFormDialog>("Kullanıcı Düzenle", p,
             new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });

@@ -2,25 +2,101 @@
 
 <MudDialog>
     <DialogContent>
-        <MudStack Spacing="3">
-            <MudTextField @bind-Value="_displayName" Label="Ad Soyad" Variant="Variant.Outlined" />
-            <MudTextField @bind-Value="_email" Label="E-posta" Required="true" Variant="Variant.Outlined" InputType="InputType.Email" Disabled="@(User is not null)" />
-            @if (User is null)
-            {
-                <MudTextField @bind-Value="_password" Label="Şifre" Required="true" Variant="Variant.Outlined" InputType="InputType.Password" />
-            }
-            <MudSelect T="string" @bind-SelectedValues="_selectedRoles" Label="Roller" Variant="Variant.Outlined" MultiSelection="true">
-                @foreach (var role in AllRoles)
+        <MudForm @ref="_form" @bind-IsValid="_formValid">
+            <MudStack Spacing="3">
+
+                <!-- Ad Soyad -->
+                <MudTextField @bind-Value="_displayName"
+                              Label="Ad Soyad"
+                              Variant="Variant.Outlined"
+                              Immediate="true"
+                              Validation="@(new Func<string, string?>(v =>
+                                  string.IsNullOrWhiteSpace(v) ? "Ad Soyad zorunludur." : null))" />
+
+                <!-- E-posta -->
+                <MudTextField @bind-Value="_email"
+                              Label="E-posta"
+                              Required="true"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Immediate="true"
+                              Disabled="@(User is not null)"
+                              Validation="@(new Func<string, string?>(ValidateEmail))"
+                              AdornmentIcon="@(_emailOk ? Icons.Material.Filled.CheckCircle : "")"
+                              AdornmentColor="Color.Success"
+                              Adornment="@(_emailOk ? Adornment.End : Adornment.None)" />
+
+                <!-- Şifre (sadece yeni kullanıcı) -->
+                @if (User is null)
                 {
-                    <MudSelectItem T="string" Value="role">@role</MudSelectItem>
+                    <MudTextField @bind-Value="_password"
+                                  Label="Şifre"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                  Immediate="true"
+                                  Validation="@(new Func<string, string?>(ValidatePassword))"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                                  OnAdornmentClick="@(() => _showPassword = !_showPassword)">
+                        <HelperContent>
+                            <MudStack Row="true" Spacing="1" Style="flex-wrap:wrap;margin-top:2px">
+                                @PasswordHint(_password.Length >= 8, "8+ karakter")
+                                @PasswordHint(_password.Any(char.IsUpper), "Büyük harf")
+                                @PasswordHint(_password.Any(char.IsDigit), "Rakam")
+                            </MudStack>
+                        </HelperContent>
+                    </MudTextField>
+
+                    <MudTextField @bind-Value="_passwordConfirm"
+                                  Label="Şifre Tekrar"
+                                  Required="true"
+                                  Variant="Variant.Outlined"
+                                  InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                                  Immediate="true"
+                                  Validation="@(new Func<string, string?>(v =>
+                                      v != _password ? "Şifreler eşleşmiyor." : null))" />
                 }
-            </MudSelect>
-            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
-        </MudStack>
+
+                <!-- Roller -->
+                <MudSelect T="string" @bind-SelectedValues="_selectedRoles"
+                           Label="Roller" Variant="Variant.Outlined"
+                           MultiSelection="true"
+                           HelperText="Bir veya daha fazla rol seçin">
+                    @foreach (var role in AllRoles)
+                    {
+                        <MudSelectItem T="string" Value="role">@RoleLabel(role)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <!-- Firma Seçimi -->
+                @if (Firms.Count > 0)
+                {
+                    <MudSelect T="string" Value="@_firmSlug"
+                               ValueChanged="@((string v) => _firmSlug = v)"
+                               Label="Yönetim Firması"
+                               Variant="Variant.Outlined"
+                               HelperText="Manager / Personel / Muhasebe / Denetçi rolü için firma seçin">
+                        <MudSelectItem T="string" Value="@("")">— Firma Yok —</MudSelectItem>
+                        @foreach (var firm in Firms)
+                        {
+                            <MudSelectItem T="string" Value="@firm.Slug">@firm.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                }
+
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+                }
+
+            </MudStack>
+        </MudForm>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="SubmitAsync" Disabled="_busy">
             @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
             Kaydet
         </MudButton>
@@ -32,13 +108,16 @@
     [Parameter] public AppUser? User { get; set; }
     [Parameter] public List<string> CurrentRoles { get; set; } = [];
     [Parameter] public List<string> AllRoles { get; set; } = [];
+    [Parameter] public List<FirmRegDto> Firms { get; set; } = [];
 
-    private string _displayName = "";
-    private string _email = "";
-    private string _password = "";
+    private MudForm _form = default!;
+    private bool _formValid;
+    private string _displayName = "", _email = "", _password = "", _passwordConfirm = "", _firmSlug = "";
     private IReadOnlyCollection<string> _selectedRoles = [];
     private string? _error;
-    private bool _busy;
+    private bool _busy, _showPassword;
+
+    private bool _emailOk => !string.IsNullOrWhiteSpace(_email) && ValidateEmail(_email) is null;
 
     protected override void OnParametersSet()
     {
@@ -46,34 +125,84 @@
         {
             _displayName = User.DisplayName ?? "";
             _email = User.Email ?? "";
+            _firmSlug = User.FirmSlug ?? "";
             _selectedRoles = CurrentRoles.ToList();
         }
     }
 
+    private static string? ValidateEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return "E-posta zorunludur.";
+        var at = email.IndexOf('@');
+        if (at <= 0) return "Geçerli bir e-posta adresi girin.";
+        var dot = email.LastIndexOf('.');
+        if (dot <= at + 1 || dot >= email.Length - 1) return "Geçerli bir e-posta adresi girin.";
+        return null;
+    }
+
+    private static string? ValidatePassword(string pwd)
+    {
+        if (string.IsNullOrWhiteSpace(pwd)) return "Şifre zorunludur.";
+        if (pwd.Length < 8) return "En az 8 karakter olmalıdır.";
+        if (!pwd.Any(char.IsUpper)) return "En az bir büyük harf gereklidir.";
+        if (!pwd.Any(char.IsDigit)) return "En az bir rakam gereklidir.";
+        return null;
+    }
+
+    private RenderFragment PasswordHint(bool met, string label) => __builder =>
+    {
+        var color = met ? "color:#2e7d32;font-weight:600" : "color:#9e9e9e";
+        var icon = met ? "✓" : "○";
+        <span style="@($"font-size:11px;margin-right:6px;{color}")">@icon @label</span>;
+    };
+
+    private static string RoleLabel(string role) => role switch
+    {
+        "SuperAdmin" => "SuperAdmin",
+        "Manager"    => "Yönetici (Manager)",
+        "SiteStaff"  => "Personel (SiteStaff)",
+        "Accountant" => "Muhasebe (Accountant)",
+        "Auditor"    => "Denetçi (Auditor)",
+        "Resident"   => "Sakin (Resident)",
+        _            => role
+    };
+
     private async Task SubmitAsync()
     {
-        if (string.IsNullOrWhiteSpace(_email)) { _error = "E-posta zorunludur."; return; }
+        await _form.Validate();
+        if (!_formValid && User is null) { _error = "Lütfen hataları düzeltin."; return; }
+
         _busy = true; _error = null;
         try
         {
             if (User is null)
             {
-                if (string.IsNullOrWhiteSpace(_password)) { _error = "Şifre zorunludur."; _busy = false; return; }
-                var newUser = new AppUser { UserName = _email, Email = _email, DisplayName = _displayName.Trim(), EmailConfirmed = true };
+                var newUser = new AppUser
+                {
+                    UserName = _email.Trim(), Email = _email.Trim(),
+                    DisplayName = _displayName.Trim(),
+                    EmailConfirmed = true,
+                    FirmSlug = string.IsNullOrEmpty(_firmSlug) ? null : _firmSlug
+                };
                 var result = await UserManager.CreateAsync(newUser, _password);
-                if (!result.Succeeded) { _error = string.Join(", ", result.Errors.Select(e => e.Description)); _busy = false; return; }
+                if (!result.Succeeded)
+                {
+                    _error = string.Join(" ", result.Errors.Select(e => e.Description));
+                    return;
+                }
                 if (_selectedRoles.Any())
                     await UserManager.AddToRolesAsync(newUser, _selectedRoles);
             }
             else
             {
                 User.DisplayName = _displayName.Trim();
+                User.FirmSlug = string.IsNullOrEmpty(_firmSlug) ? null : _firmSlug;
                 await UserManager.UpdateAsync(User);
                 var currentRoles = await UserManager.GetRolesAsync(User);
-                var toAdd = _selectedRoles.Except(currentRoles).ToList();
+                var toAdd    = _selectedRoles.Except(currentRoles).ToList();
                 var toRemove = currentRoles.Except(_selectedRoles).ToList();
                 if (toRemove.Any()) await UserManager.RemoveFromRolesAsync(User, toRemove);
-                if (toAdd.Any()) await UserManager.AddToRolesAsync(User, toAdd);
+                if (toAdd.Any())    await UserManager.AddToRolesAsync(User, toAdd);
             }
             MudDialog.Close(DialogResult.Ok(true));
         }
