@@ -1,5 +1,5 @@
 @page "/site/{SiteId:guid}/aidatlar"
-@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteManager,Auditor")]
 @inject ISiteManagementService SiteService
 @inject ISiteFeeService FeeService
 @inject ISiteReportService ReportService

@@ -56,8 +56,8 @@
                 </MudNavLink>
             </AuthorizeView>
 
-            <!-- ══ SiteStaff / Auditor / Accountant ═══════════ -->
-            <AuthorizeView Roles="SiteStaff,Auditor,Accountant" Context="_s">
+            <!-- ══ SiteManager / Auditor / Accountant ═══════════ -->
+            <AuthorizeView Roles="SiteManager,Auditor,Accountant" Context="_s">
                 <NavSection Label="SİTELER" />
                 <MudNavLink Href="/sitelerim" Icon="@Icons.Material.Filled.Apartment" IconColor="Color.Primary">
                     Sitelerim
@@ -108,7 +108,7 @@
     {
         if (user.IsInRole("SuperAdmin"))  return "SuperAdmin";
         if (user.IsInRole("Manager"))     return "Yönetici";
-        if (user.IsInRole("SiteStaff"))   return "Personel";
+        if (user.IsInRole("SiteManager"))   return "Personel";
         if (user.IsInRole("Accountant"))  return "Muhasebe";
         if (user.IsInRole("Auditor"))     return "Denetçi";
         if (user.IsInRole("Resident"))    return "Sakin";

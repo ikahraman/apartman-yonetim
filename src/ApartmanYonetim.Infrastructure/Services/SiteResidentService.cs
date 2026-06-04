@@ -1,11 +1,13 @@
 using ApartmanYonetim.Application.Services;
 using ApartmanYonetim.Domain.Entities.Site;
 using ApartmanYonetim.Domain.Enums;
+using ApartmanYonetim.Infrastructure.Identity;
 using ApartmanYonetim.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 namespace ApartmanYonetim.Infrastructure.Services;
 
-public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentService
+public class SiteResidentService(SiteDbContextFactory factory, UserManager<AppUser> userManager) : ISiteResidentService
 {
     public async Task<List<UnitSummaryDto>> GetUnitsAsync(string dbFilePath)
     {
@@ -23,7 +25,7 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
             return new UnitSummaryDto(u.Id, u.Number, u.Block, u.Floor, u.SquareMeters, u.OccupancyType,
                 r?.Id, r?.FullName, r?.Phone, r?.ResidencyType, r?.Email,
                 u.UnitType, u.ArsaPay, u.BlockId, u.BlockRef?.Name,
-                u.DaireTypeId, u.DaireType?.Name);
+                u.DaireTypeId, u.DaireType?.Name, r?.UserId);
         }).ToList();
     }
 
@@ -303,5 +305,66 @@ public class SiteResidentService(SiteDbContextFactory factory) : ISiteResidentSe
         var a = await db.BlockAssignments.FindAsync(assignmentId) ?? throw new KeyNotFoundException();
         a.EndDate = DateOnly.FromDateTime(DateTime.Today);
         await db.SaveChangesAsync();
+    }
+
+    public async Task<(string UserName, string Password)> CreatePortalUserAsync(string dbFilePath, Guid residentId, Guid siteId, string siteSlug)
+    {
+        await using var db = await factory.CreateAndMigrateAsync(dbFilePath);
+        var resident = await db.Residents.FirstOrDefaultAsync(r => r.Id == residentId)
+            ?? throw new KeyNotFoundException("Sakin bulunamadı.");
+
+        if (resident.UserId is not null)
+            throw new InvalidOperationException("Bu sakin için zaten bir portal hesabı var.");
+
+        var unit = await db.Units.FindAsync(resident.UnitId);
+        var block = unit?.Block?.ToLowerInvariant().Trim() ?? "";
+        var unitNum = unit?.Number?.ToLowerInvariant().Trim() ?? "";
+        var slugPart = siteSlug.Length > 12 ? siteSlug[..12] : siteSlug;
+        var baseUsername = $"{block}{unitNum}.{slugPart}".Replace(" ", "");
+
+        var username = baseUsername;
+        var suffix = 1;
+        while (await userManager.FindByNameAsync(username) is not null)
+            username = $"{baseUsername}{suffix++}";
+
+        var password = GeneratePassword();
+        var email = string.IsNullOrWhiteSpace(resident.Email)
+            ? $"{username}@{siteSlug}.ap.local"
+            : resident.Email;
+
+        var user = new AppUser
+        {
+            UserName = username,
+            Email = email,
+            EmailConfirmed = true,
+            DisplayName = resident.FullName,
+            SiteId = siteId
+        };
+        var result = await userManager.CreateAsync(user, password);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(string.Join(", ", result.Errors.Select(e => e.Description)));
+
+        await userManager.AddToRoleAsync(user, "Resident");
+        resident.UserId = user.Id;
+        await db.SaveChangesAsync();
+
+        return (username, password);
+    }
+
+    private static string GeneratePassword()
+    {
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string lower = "abcdefghjkmnpqrstuvwxyz";
+        const string digits = "23456789";
+        const string special = "!@#$";
+        var rng = Random.Shared;
+        var chars = new char[10];
+        chars[0] = upper[rng.Next(upper.Length)];
+        chars[1] = lower[rng.Next(lower.Length)];
+        chars[2] = digits[rng.Next(digits.Length)];
+        chars[3] = special[rng.Next(special.Length)];
+        var all = upper + lower + digits;
+        for (int i = 4; i < 10; i++) chars[i] = all[rng.Next(all.Length)];
+        return new string(chars.OrderBy(_ => rng.Next()).ToArray());
     }
 }

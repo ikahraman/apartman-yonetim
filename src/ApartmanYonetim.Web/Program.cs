@@ -131,7 +131,7 @@ app.MapPost("/api/auth/login", async (
     var password = form["password"].ToString();
     var returnUrl = form["returnUrl"].ToString() is { Length: > 0 } r ? r : "/";
 
-    var user = await userMgr.FindByEmailAsync(email);
+    var user = await userMgr.FindByEmailAsync(email) ?? await userMgr.FindByNameAsync(email);
     if (user is null) { ctx.Response.Redirect($"/giris?hata=1&returnUrl={Uri.EscapeDataString(returnUrl)}"); return; }
 
     // Set tenant context before signing in so FirmDbContext resolves correctly if needed

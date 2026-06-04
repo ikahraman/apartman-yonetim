@@ -19,7 +19,7 @@
         <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;padding-bottom:2px">
             @foreach (var (label, icon, route, staffVisible) in _modules)
             {
-                @if (!staffVisible && _isSiteStaff) { continue; }
+                @if (!staffVisible && _isSiteManager) { continue; }
                 var r = route;
                 var active = route == ActiveRoute;
                 <MudButton StartIcon="@icon" Size="Size.Small"
@@ -43,12 +43,12 @@
     [Parameter] public string ActiveRoute { get; set; } = "";
     [Parameter] public SiteType SiteType { get; set; } = SiteType.Site;
 
-    private bool _isSiteStaff;
+    private bool _isSiteManager;
 
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        _isSiteStaff = auth.User.IsInRole("SiteStaff") &&
+        _isSiteManager = auth.User.IsInRole("SiteManager") &&
                        !auth.User.IsInRole("Manager") &&
                        !auth.User.IsInRole("SuperAdmin");
     }
@@ -69,7 +69,7 @@
         _                  => "Site"
     };
 
-    // staffVisible: false = SiteStaff'a gizli
+    // staffVisible: false = SiteManager'a gizli
     private static readonly (string Label, string Icon, string Route, bool StaffVisible)[] _modules =
     [
         ("Özet",      Icons.Material.Filled.Dashboard,     "ozet",     true),

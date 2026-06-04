@@ -1,9 +1,10 @@
 @page "/site/{SiteId:guid}/sakinler"
-@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteManager,Auditor")]
 @inject ISiteManagementService SiteService
 @inject ISiteResidentService ResidentService
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject UserManager<AppUser> UserManager
 
 <PageTitle>Sakinler</PageTitle>
 
@@ -88,6 +89,18 @@
                                 <MudTooltip Text="Çıkış yaptır">
                                     <MudIconButton Icon="@Icons.Material.Filled.ExitToApp" Size="Size.Small" Color="Color.Warning" OnClick="() => MoveOutAsync(context)" />
                                 </MudTooltip>
+                                @if (context.ResidentUserId is null)
+                                {
+                                    <MudTooltip Text="Portal hesabı oluştur">
+                                        <MudIconButton Icon="@Icons.Material.Filled.VpnKey" Size="Size.Small" Color="Color.Info" OnClick="() => CreatePortalUserAsync(context)" />
+                                    </MudTooltip>
+                                }
+                                else
+                                {
+                                    <MudTooltip Text="Portal hesabı mevcut">
+                                        <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Size="Size.Small" Color="Color.Success" Disabled="true" />
+                                    </MudTooltip>
+                                }
                             }
                         </MudStack>
                     }
@@ -147,6 +160,30 @@
         await ResidentService.MoveOutAsync(_site.DbFilePath, unit.ResidentId.Value, DateOnly.FromDateTime(DateTime.Today));
         Snackbar.Add($"'{unit.ResidentName}' çıkış yapıldı.", Severity.Success);
         await Reload();
+    }
+
+    private async Task CreatePortalUserAsync(UnitSummaryDto unit)
+    {
+        if (_site is null || unit.ResidentId is null) return;
+        try
+        {
+            var (userName, password) = await ResidentService.CreatePortalUserAsync(
+                _site.DbFilePath, unit.ResidentId.Value, _site.Id, _site.Slug);
+
+            var parameters = new DialogParameters<ResidentCredentialsDialog>
+            {
+                { x => x.ResidentName, unit.ResidentName ?? "" },
+                { x => x.UserName, userName },
+                { x => x.Password, password }
+            };
+            await DialogService.ShowAsync<ResidentCredentialsDialog>("Portal Hesabı Oluşturuldu", parameters,
+                new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+            await Reload();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
     }
 
     private static Color OccupancyColor(OccupancyType t) => t switch { OccupancyType.Owner => Color.Success, OccupancyType.Tenant => Color.Info, _ => Color.Default };

@@ -65,10 +65,10 @@ public class FirmStaffService(
         var identityRole = cmd.Role switch
         {
             StaffRole.SiteAdmin    => "Manager",
-            StaffRole.SiteManager  => "SiteStaff",
+            StaffRole.SiteManager  => "SiteManager",
             StaffRole.Accountant   => "Accountant",
             StaffRole.Auditor      => "Auditor",
-            _                      => "SiteStaff"
+            _                      => "SiteManager"
         };
         await userManager.AddToRoleAsync(user, identityRole);
 

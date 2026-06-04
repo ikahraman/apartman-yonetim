@@ -25,9 +25,23 @@ public static class DbSeeder
     {
         await db.Database.MigrateAsync();
 
-        foreach (var role in new[] { "SuperAdmin", "Manager", "SiteStaff", "Auditor", "Accountant", "Resident" })
+        foreach (var role in new[] { "SuperAdmin", "Manager", "SiteManager", "Auditor", "Accountant", "Resident" })
             if (!await roleMgr.RoleExistsAsync(role))
                 await roleMgr.CreateAsync(new IdentityRole(role));
+
+        // SiteStaff → SiteManager migration (eski rol adı)
+        var oldRole = await roleMgr.FindByNameAsync("SiteStaff");
+        if (oldRole != null)
+        {
+            var usersInOldRole = await userManager.GetUsersInRoleAsync("SiteStaff");
+            foreach (var u in usersInOldRole)
+            {
+                await userManager.RemoveFromRoleAsync(u, "SiteStaff");
+                if (!await userManager.IsInRoleAsync(u, "SiteManager"))
+                    await userManager.AddToRoleAsync(u, "SiteManager");
+            }
+            await roleMgr.DeleteAsync(oldRole);
+        }
 
         await EnsureUser(userManager, "admin@ay.com", "Admin1234!", "Sistem Yöneticisi", null, ["SuperAdmin"]);
         // Manager rolü SuperAdmin'e verilmemeli — varsa temizle
@@ -61,7 +75,7 @@ public static class DbSeeder
                 await SeedGunesSitesi(firmDb, siteFactory);
             });
 
-        var siteStaff = await EnsureUser(userManager, "personel@ay.com", "Personel1234!", "Test Personel", "ozgur-yonetim", ["SiteStaff"]);
+        var siteStaff = await EnsureUser(userManager, "personel@ay.com", "Personel1234!", "Test Personel", "ozgur-yonetim", ["SiteManager"]);
         var auditor   = await EnsureUser(userManager, "denetci@ay.com",  "Denetci1234!",  "Test Denetçi",  "ozgur-yonetim", ["Auditor"]);
 
         await using (var firmDb = firmFactory.Create(ozgurReg.DbFilePath))
@@ -105,6 +119,24 @@ public static class DbSeeder
                 {
                     firstResident.UserId = residentUser.Id;
                     await laleDb.SaveChangesAsync();
+                }
+            }
+
+            var residentUser2 = await EnsureUser(userManager, "sakin2@ay.com", "Sakin21234!", "Test Sakin 2", "ozgur-yonetim", ["Resident"]);
+            var gunesSite = await firmDb.Sites.FirstOrDefaultAsync(s => s.Slug == "gunes-sitesi");
+            if (gunesSite is not null)
+            {
+                if (residentUser2.SiteId != gunesSite.Id)
+                {
+                    residentUser2.SiteId = gunesSite.Id;
+                    await userManager.UpdateAsync(residentUser2);
+                }
+                await using var gunesDb = siteFactory.Create(gunesSite.DbFilePath);
+                var firstResident2 = await gunesDb.Residents.OrderBy(r => r.Id).FirstOrDefaultAsync();
+                if (firstResident2 is not null && firstResident2.UserId is null)
+                {
+                    firstResident2.UserId = residentUser2.Id;
+                    await gunesDb.SaveChangesAsync();
                 }
             }
         }

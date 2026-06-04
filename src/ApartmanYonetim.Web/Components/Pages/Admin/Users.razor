@@ -186,7 +186,7 @@
                     <MudStack Row="true" Spacing="0">
                         <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                        OnClick="@(() => OpenEditDialog(context))" />
-                        @if (context.Roles.Any(r => r is "SiteStaff" or "Auditor" or "Accountant"))
+                        @if (context.Roles.Any(r => r is "SiteManager" or "Auditor" or "Accountant"))
                         {
                             <MudTooltip Text="Site Erişimi">
                                 <MudIconButton Icon="@Icons.Material.Filled.AssignmentInd" Size="Size.Small"
@@ -257,7 +257,7 @@
     {
         "SuperAdmin" => Color.Error,
         "Manager"    => Color.Primary,
-        "SiteStaff"  => Color.Info,
+        "SiteManager"  => Color.Info,
         "Accountant" => Color.Warning,
         "Auditor"    => Color.Secondary,
         "Resident"   => Color.Tertiary,
@@ -267,7 +267,7 @@
     private static string RoleLabel(string role) => role switch
     {
         "Manager"    => "Yönetici",
-        "SiteStaff"  => "Personel",
+        "SiteManager"  => "Personel",
         "Accountant" => "Muhasebe",
         "Auditor"    => "Denetçi",
         "Resident"   => "Sakin",

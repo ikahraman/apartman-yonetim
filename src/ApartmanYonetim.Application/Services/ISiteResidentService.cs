@@ -11,7 +11,8 @@ public record UnitSummaryDto(
     ResidencyType? ResidencyType, string? ResidentEmail = null,
     UnitType UnitType = UnitType.Daire, decimal? ArsaPay = null,
     Guid? BlockId = null, string? BlockName = null,
-    Guid? DaireTypeId = null, string? DaireTypeName = null);
+    Guid? DaireTypeId = null, string? DaireTypeName = null,
+    string? ResidentUserId = null);
 
 public record SiteKisimDto(Guid Id, string Name, string? Code, string? Description);
 public record SiteKisimCommand(string Name, string? Code, string? Description);
@@ -45,6 +46,7 @@ public interface ISiteResidentService
     Task MoveOutAsync(string dbFilePath, Guid residentId, DateOnly moveOutDate);
     Task SetResidentUserIdAsync(string dbFilePath, Guid residentId, string userId);
     Task<ResidentDto?> GetByUserIdAsync(string dbFilePath, string userId);
+    Task<(string UserName, string Password)> CreatePortalUserAsync(string dbFilePath, Guid residentId, Guid siteId, string siteSlug);
 
     Task<List<SiteKisimDto>> GetKisimlarAsync(string dbFilePath);
     Task<SiteKisimDto> AddKisimAsync(string dbFilePath, SiteKisimCommand cmd);

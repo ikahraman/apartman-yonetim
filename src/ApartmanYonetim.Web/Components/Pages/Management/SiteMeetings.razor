@@ -1,5 +1,5 @@
 @page "/site/{SiteId:guid}/toplanti"
-@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteStaff,Auditor")]
+@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteManager,Auditor")]
 @inject ISiteManagementService SiteService
 @inject ISiteMeetingService MeetingService
 @inject IDialogService DialogService
