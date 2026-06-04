@@ -139,7 +139,14 @@ app.MapPost("/api/auth/login", async (
         tenantCtx.SetFirmSlug(user.FirmSlug);
 
     var result = await signInMgr.PasswordSignInAsync(user, password, isPersistent: true, lockoutOnFailure: false);
-    ctx.Response.Redirect(result.Succeeded ? returnUrl : $"/giris?hata=1&returnUrl={Uri.EscapeDataString(returnUrl)}");
+    if (!result.Succeeded) { ctx.Response.Redirect($"/giris?hata=1&returnUrl={Uri.EscapeDataString(returnUrl)}"); return; }
+
+    var roles = await userMgr.GetRolesAsync(user);
+    var destination = returnUrl != "/" ? returnUrl
+        : roles.Contains("SuperAdmin") ? "/admin/firmalar"
+        : roles.Contains("Resident") ? "/sakin"
+        : "/";
+    ctx.Response.Redirect(destination);
 });
 
 // Logout endpoints
