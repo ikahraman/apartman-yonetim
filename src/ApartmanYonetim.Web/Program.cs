@@ -65,7 +65,9 @@ builder.Services.AddIdentityCore<AppUser>(options =>
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 
-var firmDbDir = builder.Configuration["FirmDbDirectory"] ?? "FirmDatabases";
+var firmDbDir = azureHome is not null
+    ? $"{azureHome}/data/FirmDatabases"
+    : builder.Configuration["FirmDbDirectory"] ?? "FirmDatabases";
 Directory.CreateDirectory(firmDbDir);
 builder.Services.AddSingleton(new FirmDbContextFactory(firmDbDir));
 builder.Services.AddScoped<FirmDbContext>(sp =>
@@ -88,7 +90,9 @@ builder.Services.AddScoped<FirmDbContext>(sp =>
     return factory.CreateBySlug(tenant.FirmSlug!);
 });
 
-var siteDbDir = builder.Configuration["SiteDbDirectory"] ?? "SiteDatabases";
+var siteDbDir = azureHome is not null
+    ? $"{azureHome}/data/SiteDatabases"
+    : builder.Configuration["SiteDbDirectory"] ?? "SiteDatabases";
 Directory.CreateDirectory(siteDbDir);
 builder.Services.AddSingleton(new SiteDbContextFactory(siteDbDir));
 
