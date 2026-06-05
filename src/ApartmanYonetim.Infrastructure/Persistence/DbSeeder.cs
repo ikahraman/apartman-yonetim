@@ -56,7 +56,9 @@ public static class DbSeeder
         {
             await MigrateExistingFirmDbsAsync(db, firmFactory);
             await MigrateExistingSiteDbsAsync(db, firmFactory, siteFactory);
+            await EnsureFirmDbDataAsync(db, userManager, firmFactory, siteFactory);
             await SeedMissingSubscriptions(db);
+            await UpdateSubscriptionDatesAsync(db);
             await SeedMissingObligations(db, firmFactory);
             await SeedMissingStaffDataAsync(db, userManager, firmFactory);
             await SeedEgitimAsync(db, userManager);
@@ -553,6 +555,123 @@ public static class DbSeeder
             }
             catch { /* firma DB yoksa atla */ }
         }
+    }
+
+    // Boş FirmDb'leri yeniden doldur — path değişiminden sonra DB resetlenmiş olabilir
+    private static async Task EnsureFirmDbDataAsync(
+        MainDbContext db, UserManager<AppUser> userManager,
+        FirmDbContextFactory firmFactory, SiteDbContextFactory siteFactory)
+    {
+        var firms = await db.FirmRegistrations.ToListAsync();
+        foreach (var firm in firms)
+        {
+            try
+            {
+                await using var firmDb = await firmFactory.CreateAndMigrateAsync(firm.Slug);
+                if (await firmDb.Companies.AnyAsync()) continue; // Zaten dolu
+
+                switch (firm.Slug)
+                {
+                    case "ozgur-yonetim":
+                        firmDb.Companies.Add(new ManagementCompany
+                        {
+                            Name = "Özgür Yönetim A.Ş.", Slug = "ozgur-yonetim",
+                            Email = "info@ozguryonetim.com", ContactPerson = "Özgür Kaplan"
+                        });
+                        await firmDb.SaveChangesAsync();
+                        await SeedLaleApartmani(firmDb, siteFactory);
+                        await SeedGunesSitesi(firmDb, siteFactory);
+                        await firmDb.SaveChangesAsync();
+
+                        // Personel & site atamaları
+                        var staffUser    = await userManager.FindByEmailAsync("personel@ay.com");
+                        var auditorUser  = await userManager.FindByEmailAsync("denetci@ay.com");
+                        var company      = await firmDb.Companies.FirstAsync();
+                        foreach (var (u, role) in new[] { (staffUser, StaffRole.SiteManager), (auditorUser, StaffRole.Auditor) })
+                        {
+                            if (u is null) continue;
+                            if (!await firmDb.CompanyStaff.AnyAsync(s => s.UserId == u.Id))
+                                firmDb.CompanyStaff.Add(new CompanyStaff { CompanyId = company.Id, UserId = u.Id, Role = role, IsActive = true });
+                        }
+                        await firmDb.SaveChangesAsync();
+
+                        foreach (var slug in new[] { "lale-apartmani", "gunes-sitesi" })
+                        {
+                            var site = await firmDb.Sites.FirstOrDefaultAsync(s => s.Slug == slug);
+                            if (site is null) continue;
+                            foreach (var u in new[] { staffUser, auditorUser })
+                            {
+                                if (u is null) continue;
+                                var staffRecord = await firmDb.CompanyStaff.FirstOrDefaultAsync(s => s.UserId == u.Id);
+                                if (staffRecord is null) continue;
+                                if (!await firmDb.SiteStaffAssignments.AnyAsync(a => a.StaffId == staffRecord.Id && a.SiteId == site.Id && a.RemovedAt == null))
+                                    firmDb.SiteStaffAssignments.Add(new SiteStaffAssignment { StaffId = staffRecord.Id, SiteId = site.Id });
+                            }
+                        }
+                        await firmDb.SaveChangesAsync();
+
+                        // Resident linklemesi
+                        await LinkResidentUserAsync(userManager, siteFactory, firmDb, "sakin@ay.com",  "lale-apartmani");
+                        await LinkResidentUserAsync(userManager, siteFactory, firmDb, "sakin2@ay.com", "gunes-sitesi");
+                        break;
+
+                    case "sevgi-yonetim":
+                        firmDb.Companies.Add(new ManagementCompany
+                        {
+                            Name = "Sevgi Yönetim A.Ş.", Slug = "sevgi-yonetim",
+                            Email = "info@sevgiyonetim.com", ContactPerson = "Sevgi Demir"
+                        });
+                        await firmDb.SaveChangesAsync();
+                        await SeedBaharSitesi(firmDb, siteFactory);
+                        await SeedPrestijTopluYapi(firmDb, siteFactory);
+                        break;
+                }
+            }
+            catch { /* Bir firmada hata olursa diğerlerine devam et */ }
+        }
+    }
+
+    private static async Task LinkResidentUserAsync(
+        UserManager<AppUser> userManager, SiteDbContextFactory siteFactory,
+        FirmDbContext firmDb, string email, string siteSlug)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+        var site = await firmDb.Sites.FirstOrDefaultAsync(s => s.Slug == siteSlug);
+        if (user is null || site is null) return;
+
+        if (user.SiteId != site.Id)
+        {
+            user.SiteId = site.Id;
+            await userManager.UpdateAsync(user);
+        }
+        await using var siteDb = siteFactory.Create(site.DbFilePath);
+        var firstResident = await siteDb.Residents.OrderBy(r => r.Id).FirstOrDefaultAsync();
+        if (firstResident is not null && firstResident.UserId is null)
+        {
+            firstResident.UserId = user.Id;
+            await siteDb.SaveChangesAsync();
+        }
+    }
+
+    // Süresi dolmuş abonelikleri 2026-2027 dönemine güncelle
+    private static async Task UpdateSubscriptionDatesAsync(MainDbContext db)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var subs = await db.FirmSubscriptions.ToListAsync();
+        bool changed = false;
+        foreach (var sub in subs)
+        {
+            if (sub.ContractEndDate < today)
+            {
+                sub.ContractStartDate = new DateOnly(2026, 1, 1);
+                sub.ContractEndDate   = new DateOnly(2026, 12, 31);
+                sub.Status            = SubscriptionStatus.Active;
+                sub.LastModifiedAt    = DateTime.UtcNow;
+                sub.LastModifiedBy    = "system-seed";
+                changed = true;
+            }
+        }
+        if (changed) await db.SaveChangesAsync();
     }
 
     private static async Task SeedMissingStaffDataAsync(MainDbContext db, UserManager<AppUser> userManager, FirmDbContextFactory firmFactory)
