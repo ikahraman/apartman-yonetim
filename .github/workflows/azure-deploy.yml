@@ -30,14 +30,3 @@ jobs:
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
           package: deploy.zip
 
-  # Render main branch'ini izliyor — master'a push edilince main'i de güncelle
-  sync-main:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Push master to main
-        run: |
-          git push origin master:main
