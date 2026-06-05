@@ -58,6 +58,7 @@ public static class DbSeeder
             await SeedMissingSubscriptions(db);
             await SeedMissingObligations(db, firmFactory);
             await SeedMissingStaffDataAsync(db, userManager, firmFactory);
+            await SeedEgitimAsync(db, userManager);
             return;
         }
 
