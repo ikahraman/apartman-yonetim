@@ -1,9 +1,18 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Nav
+@implements IDisposable
 
 <MudThemeProvider />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
+
+<MudOverlay Visible="_navigating" DarkBackground="true" ZIndex="9999" AutoClose="false">
+    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <MudText Typo="Typo.body1" Style="color:white">Sayfa açılıyor...</MudText>
+    </MudStack>
+</MudOverlay>
 
 <MudLayout>
     <MudAppBar Elevation="1" Dense="true">
@@ -42,4 +51,31 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _navigating;
+    private IDisposable? _locationChangingHandler;
+
+    protected override void OnInitialized()
+    {
+        _locationChangingHandler = Nav.RegisterLocationChangingHandler(OnLocationChanging);
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private ValueTask OnLocationChanging(LocationChangingContext ctx)
+    {
+        _navigating = true;
+        InvokeAsync(StateHasChanged);
+        return ValueTask.CompletedTask;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _navigating = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        _locationChangingHandler?.Dispose();
+        Nav.LocationChanged -= OnLocationChanged;
+    }
 }
