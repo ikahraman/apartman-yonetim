@@ -257,7 +257,7 @@
     private static Color RoleColor(string role) => role switch
     {
         "SuperAdmin" => Color.Error,
-        "Manager"    => Color.Primary,
+        "FirmAdmin"  => Color.Primary,
         "SiteManager"  => Color.Info,
         "Accountant" => Color.Warning,
         "Auditor"    => Color.Secondary,
@@ -267,7 +267,7 @@
 
     private static string RoleLabel(string role) => role switch
     {
-        "Manager"    => "Yönetici",
+        "FirmAdmin"  => "Yönetici",
         "SiteManager"  => "Personel",
         "Accountant" => "Muhasebe",
         "Auditor"    => "Denetçi",

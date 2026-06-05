@@ -49,7 +49,7 @@
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
         _isSiteManager = auth.User.IsInRole("SiteManager") &&
-                       !auth.User.IsInRole("Manager") &&
+                       !auth.User.IsInRole("FirmAdmin") &&
                        !auth.User.IsInRole("SuperAdmin");
     }
 

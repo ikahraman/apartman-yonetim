@@ -1,6 +1,6 @@
 @page "/firma/site-ekle/toplu-yapi"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = "Manager")]
+@attribute [Authorize(Roles = "FirmAdmin")]
 @inject ISiteManagementService SiteService
 @inject IManagementCompanyService CompanyService
 @inject ISiteResidentService ResidentService

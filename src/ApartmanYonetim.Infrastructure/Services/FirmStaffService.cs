@@ -64,7 +64,7 @@ public class FirmStaffService(
 
         var identityRole = cmd.Role switch
         {
-            StaffRole.SiteAdmin    => "Manager",
+            StaffRole.SiteAdmin    => "FirmAdmin",
             StaffRole.SiteManager  => "SiteManager",
             StaffRole.Accountant   => "Accountant",
             StaffRole.Auditor      => "Auditor",
@@ -139,7 +139,7 @@ public class FirmStaffService(
         foreach (var u in users)
         {
             var roles = await userManager.GetRolesAsync(u);
-            if (roles.Contains("Manager"))
+            if (roles.Contains("FirmAdmin"))
                 result.Add(new ManagerLookupDto(u.Id, u.DisplayName ?? u.Email ?? "", u.Email));
         }
         return result;

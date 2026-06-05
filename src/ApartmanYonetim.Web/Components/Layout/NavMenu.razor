@@ -28,7 +28,7 @@
             </a>
 
             <!-- ══ MANAGER ════════════════════════════════════ -->
-            <AuthorizeView Roles="Manager" Context="_m">
+            <AuthorizeView Roles="FirmAdmin" Context="_m">
 
                 <NavSection Label="SİTELER" />
                 <MudNavLink Href="/sitelerim" Icon="@Icons.Material.Filled.Apartment" IconColor="Color.Primary">
@@ -115,7 +115,7 @@
     private static string RoleLabel(System.Security.Claims.ClaimsPrincipal user)
     {
         if (user.IsInRole("SuperAdmin"))  return "SuperAdmin";
-        if (user.IsInRole("Manager"))     return "Yönetici";
+        if (user.IsInRole("FirmAdmin"))    return "Yönetici";
         if (user.IsInRole("SiteManager"))   return "Personel";
         if (user.IsInRole("Accountant"))  return "Muhasebe";
         if (user.IsInRole("Auditor"))     return "Denetçi";

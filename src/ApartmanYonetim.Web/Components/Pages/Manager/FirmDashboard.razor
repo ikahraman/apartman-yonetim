@@ -1,6 +1,6 @@
 @page "/firma/ozet"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = "Manager")]
+@attribute [Authorize(Roles = "FirmAdmin")]
 @inject IFirmDashboardService DashService
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav

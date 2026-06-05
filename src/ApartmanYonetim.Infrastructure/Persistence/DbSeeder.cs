@@ -25,7 +25,7 @@ public static class DbSeeder
     {
         await db.Database.MigrateAsync();
 
-        foreach (var role in new[] { "SuperAdmin", "Manager", "SiteManager", "Auditor", "Accountant", "Resident", "EgitimAdmin" })
+        foreach (var role in new[] { "SuperAdmin", "FirmAdmin", "SiteManager", "Auditor", "Accountant", "Resident", "EgitimAdmin" })
             if (!await roleMgr.RoleExistsAsync(role))
                 await roleMgr.CreateAsync(new IdentityRole(role));
 
@@ -43,11 +43,27 @@ public static class DbSeeder
             await roleMgr.DeleteAsync(oldRole);
         }
 
+        // Manager → FirmAdmin migration (eski rol adı)
+        var oldManagerRole = await roleMgr.FindByNameAsync("Manager");
+        if (oldManagerRole != null)
+        {
+            var usersInManagerRole = await userManager.GetUsersInRoleAsync("Manager");
+            foreach (var u in usersInManagerRole)
+            {
+                await userManager.RemoveFromRoleAsync(u, "Manager");
+                if (!await userManager.IsInRoleAsync(u, "FirmAdmin"))
+                    await userManager.AddToRoleAsync(u, "FirmAdmin");
+            }
+            await roleMgr.DeleteAsync(oldManagerRole);
+        }
+
         await EnsureUser(userManager, "admin@ay.com", "Admin1234!", "Sistem Yöneticisi", null, ["SuperAdmin"]);
-        // Manager rolü SuperAdmin'e verilmemeli — varsa temizle
+        // FirmAdmin rolü SuperAdmin'e verilmemeli — varsa temizle (eski "Manager" adı dahil)
         var adminUser = await userManager.FindByEmailAsync("admin@ay.com");
         if (adminUser != null && await userManager.IsInRoleAsync(adminUser, "Manager"))
             await userManager.RemoveFromRoleAsync(adminUser, "Manager");
+        if (adminUser != null && await userManager.IsInRoleAsync(adminUser, "FirmAdmin"))
+            await userManager.RemoveFromRoleAsync(adminUser, "FirmAdmin");
 
         await SeedPackages(db);
         await SeedBillingConfig(db);
@@ -214,7 +230,7 @@ public static class DbSeeder
             });
             await firmDb.SaveChangesAsync();
         }
-        await EnsureUser(userManager, managerEmail, managerPassword, managerDisplayName, slug, ["Manager"]);
+        await EnsureUser(userManager, managerEmail, managerPassword, managerDisplayName, slug, ["FirmAdmin"]);
         if (!await firmDb.Sites.AnyAsync())
             await seedAction(firmDb);
         return reg;
@@ -690,8 +706,8 @@ public static class DbSeeder
                 foreach (var user in firmUsers)
                 {
                     var roles = await userManager.GetRolesAsync(user);
-                    // Manager (SiteAdmin) için CompanyStaff oluşturma — onlar firma sahibi
-                    if (roles.Contains("Manager")) continue;
+                    // FirmAdmin için CompanyStaff oluşturma — onlar firma sahibi
+                    if (roles.Contains("FirmAdmin")) continue;
 
                     if (await firmDb.CompanyStaff.AnyAsync(s => s.UserId == user.Id)) continue;
 

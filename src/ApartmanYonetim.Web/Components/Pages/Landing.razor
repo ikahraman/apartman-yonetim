@@ -181,7 +181,7 @@
         {
             var user = auth.User;
             if (user.IsInRole("SuperAdmin")) Nav.NavigateTo("/admin/firmalar");
-            else if (user.IsInRole("Resident") && !user.IsInRole("Manager") && !user.IsInRole("SiteManager")) Nav.NavigateTo("/sakin");
+            else if (user.IsInRole("Resident") && !user.IsInRole("FirmAdmin") && !user.IsInRole("SiteManager")) Nav.NavigateTo("/sakin");
             else Nav.NavigateTo("/sitelerim");
         }
     }

@@ -1,6 +1,6 @@
 @page "/sitelerim"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteManager,Auditor,Accountant")]
+@attribute [Authorize(Roles = "SuperAdmin,FirmAdmin,SiteManager,Auditor,Accountant")]
 @inject ISiteManagementService SiteService
 @inject ISiteResidentService ResidentService
 @inject IFirmSubscriptionService SubService
@@ -181,7 +181,7 @@
             var auth = await AuthProvider.GetAuthenticationStateAsync();
             var user = auth.User;
             var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-            _isManager = user.IsInRole("Manager") || user.IsInRole("SuperAdmin");
+            _isManager = user.IsInRole("FirmAdmin") || user.IsInRole("SuperAdmin");
             _displayName = user.FindFirst("DisplayName")?.Value ?? user.Identity?.Name ?? "";
             _sites = await SiteService.GetForUserAsync(userId);
 

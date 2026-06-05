@@ -29,7 +29,7 @@ public class TenantContext : ITenantContext
         {
             var user = _httpContextAccessor.HttpContext?.User;
             if (user is null) return null;
-            foreach (var role in new[] { "SuperAdmin", "Manager", "SiteManager", "Auditor", "Accountant", "Resident" })
+            foreach (var role in new[] { "SuperAdmin", "FirmAdmin", "SiteManager", "Auditor", "Accountant", "Resident" })
                 if (user.IsInRole(role)) return role;
             return null;
         }
