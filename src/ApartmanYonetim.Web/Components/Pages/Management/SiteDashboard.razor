@@ -24,6 +24,10 @@
     {
         <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
     }
+    else if (_loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">Veriler yüklenirken hata oluştu: @_loadError</MudAlert>
+    }
     else if (_site is not null)
     {
         <SiteModuleHeader SiteId="SiteId" SiteName="@_site.Name" City="@_site.City"
@@ -284,6 +288,7 @@
     private SiteDto? _site;
     private bool _loading = true;
     private bool _navigating;
+    private string? _loadError;
 
     private int _totalUnits, _occupiedUnits, _occupancyRate;
     private decimal _expectedAmount, _collectedAmount;
@@ -304,49 +309,60 @@
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
-        _site = await SiteService.GetByIdAsync(SiteId);
-        if (_site is null) { _loading = false; return; }
-
-        var db = _site.DbFilePath;
-        var now = DateTime.Now;
-
-        var units = await ResidentService.GetUnitsAsync(db);
-        _totalUnits = units.Count;
-        _occupiedUnits = units.Count(u => u.ResidentId is not null);
-        _occupancyRate = _totalUnits > 0 ? (int)Math.Round(_occupiedUnits * 100.0 / _totalUnits) : 0;
-
-        var schedules = await FeeService.GetSchedulesAsync(db);
-        foreach (var s in schedules.Where(s => s.IsActive))
+        _loadError = null;
+        _expectedAmount = 0; _collectedAmount = 0;
+        try
         {
-            var (exp, col, _, _) = await FeeService.GetMonthSummaryAsync(db, s.Id, now.Year, now.Month);
-            _expectedAmount += exp;
-            _collectedAmount += col;
+            _site = await SiteService.GetByIdAsync(SiteId);
+            if (_site is null) { _loading = false; return; }
+
+            var db = _site.DbFilePath;
+            var now = DateTime.Now;
+
+            var units = await ResidentService.GetUnitsAsync(db);
+            _totalUnits = units.Count;
+            _occupiedUnits = units.Count(u => u.ResidentId is not null);
+            _occupancyRate = _totalUnits > 0 ? (int)Math.Round(_occupiedUnits * 100.0 / _totalUnits) : 0;
+
+            var schedules = await FeeService.GetSchedulesAsync(db);
+            foreach (var s in schedules.Where(s => s.IsActive))
+            {
+                var (exp, col, _, _) = await FeeService.GetMonthSummaryAsync(db, s.Id, now.Year, now.Month);
+                _expectedAmount += exp;
+                _collectedAmount += col;
+            }
+            _collectionRate = _expectedAmount > 0 ? (int)Math.Round((double)_collectedAmount / (double)_expectedAmount * 100) : 0;
+
+            var (open, inProg, resolved) = await MaintenanceService.GetSummaryAsync(db);
+            _openMaintenance = open;
+            _inProgressMaintenance = inProg;
+            _resolvedMaintenance = resolved;
+
+            var acc = await AccountingService.GetSummaryAsync(db, now.Year);
+            _totalIncome = acc.TotalIncome;
+            _totalExpense = acc.TotalExpense;
+            _balance = acc.Balance;
+
+            var allAnnouncements = await AnnouncementService.GetAllAsync(db);
+            _recentAnnouncements = allAnnouncements.OrderByDescending(a => a.PublishedAt).Take(5).ToList();
+
+            var allMeetings = await MeetingService.GetAllAsync(db);
+            _upcomingMeetings = allMeetings
+                .Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now)
+                .OrderBy(m => m.MeetingDate)
+                .Take(3)
+                .ToList();
+
+            await LoadChartDataAsync(db, schedules.Where(s => s.IsActive).ToList(), now);
         }
-        _collectionRate = _expectedAmount > 0 ? (int)Math.Round((double)_collectedAmount / (double)_expectedAmount * 100) : 0;
-
-        var (open, inProg, resolved) = await MaintenanceService.GetSummaryAsync(db);
-        _openMaintenance = open;
-        _inProgressMaintenance = inProg;
-        _resolvedMaintenance = resolved;
-
-        var acc = await AccountingService.GetSummaryAsync(db, now.Year);
-        _totalIncome = acc.TotalIncome;
-        _totalExpense = acc.TotalExpense;
-        _balance = acc.Balance;
-
-        var allAnnouncements = await AnnouncementService.GetAllAsync(db);
-        _recentAnnouncements = allAnnouncements.OrderByDescending(a => a.PublishedAt).Take(5).ToList();
-
-        var allMeetings = await MeetingService.GetAllAsync(db);
-        _upcomingMeetings = allMeetings
-            .Where(m => m.Status == MeetingStatus.Scheduled && m.MeetingDate > DateTime.Now)
-            .OrderBy(m => m.MeetingDate)
-            .Take(3)
-            .ToList();
-
-        await LoadChartDataAsync(db, schedules.Where(s => s.IsActive).ToList(), now);
-
-        _loading = false;
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task LoadChartDataAsync(string dbFilePath, List<FeeScheduleDto> activeSchedules, DateTime now)
