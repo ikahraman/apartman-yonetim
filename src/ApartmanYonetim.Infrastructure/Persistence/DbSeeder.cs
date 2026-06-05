@@ -525,8 +525,8 @@ public static class DbSeeder
         {
             try
             {
-                await using var firmDb = firmFactory.CreateBySlug(firm.Slug);
-                await firmDb.Database.MigrateAsync();
+                // CreateAndMigrateAsync creates subdirectory + applies all migrations
+                await using var firmDb = await firmFactory.CreateAndMigrateAsync(firm.Slug);
             }
             catch { /* firma DB yoksa veya erişilemiyorsa atla */ }
         }

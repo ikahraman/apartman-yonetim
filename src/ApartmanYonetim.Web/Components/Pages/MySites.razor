@@ -14,6 +14,11 @@
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
 
+    @if (_loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">Veriler yüklenirken hata oluştu: @_loadError</MudAlert>
+    }
+
     @if (_isManager && _companyName is not null)
     {
         <MudPaper Elevation="0" Class="mb-4 pa-4"
@@ -161,6 +166,7 @@
     private int _overdueObligations;
     private string? _companyName;
     private string? _displayName;
+    private string? _loadError;
 
     private void GoToSite(Guid id)
     {
@@ -170,25 +176,32 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var auth = await AuthProvider.GetAuthenticationStateAsync();
-        var user = auth.User;
-        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
-        _isManager = user.IsInRole("Manager") || user.IsInRole("SuperAdmin");
-        _displayName = user.FindFirst("DisplayName")?.Value ?? user.Identity?.Name ?? "";
-        _sites = await SiteService.GetForUserAsync(userId);
-
-        var firmSlug = user.FindFirst("firm_slug")?.Value;
-        if (_isManager && firmSlug is not null)
+        try
         {
-            _sub = await SubService.GetSubscriptionByFirmAsync(firmSlug);
-            var obs = await ObligationService.GetObligationsByFirmAsync(firmSlug);
-            _overdueObligations = obs.Sum(o => o.OverdueCount);
-            var companies = await CompanyService.GetForUserAsync(userId);
-            _companyName = companies.FirstOrDefault()?.Name;
-        }
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var user = auth.User;
+            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+            _isManager = user.IsInRole("Manager") || user.IsInRole("SuperAdmin");
+            _displayName = user.FindFirst("DisplayName")?.Value ?? user.Identity?.Name ?? "";
+            _sites = await SiteService.GetForUserAsync(userId);
 
-        if (EkleParam == "1" && _isManager)
-            await OpenAddSiteDialog();
+            var firmSlug = user.FindFirst("firm_slug")?.Value;
+            if (_isManager && firmSlug is not null)
+            {
+                _sub = await SubService.GetSubscriptionByFirmAsync(firmSlug);
+                var obs = await ObligationService.GetObligationsByFirmAsync(firmSlug);
+                _overdueObligations = obs.Sum(o => o.OverdueCount);
+                var companies = await CompanyService.GetForUserAsync(userId);
+                _companyName = companies.FirstOrDefault()?.Name;
+            }
+
+            if (EkleParam == "1" && _isManager)
+                await OpenAddSiteDialog();
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
     }
 
     private async Task OpenAddSiteDialog()
