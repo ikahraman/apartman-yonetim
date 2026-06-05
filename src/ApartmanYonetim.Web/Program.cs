@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -115,6 +116,12 @@ builder.Services.AddScoped<IFirmContractService, FirmContractService>();
 builder.Services.AddScoped<IEgitimService, EgitimService>();
 
 var app = builder.Build();
+
+// Render / Azure gibi reverse proxy arkasında X-Forwarded-Proto başlığını oku
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
+});
 
 if (!app.Environment.IsDevelopment())
 {
