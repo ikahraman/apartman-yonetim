@@ -41,3 +41,8 @@ public enum ManagementFeeType { Fixed, PerUnit, PerSqm }
 
 // Denetim logu işlem tipi
 public enum AuditActionType { Create, Update, Delete }
+
+// Eğitim modülü
+public enum EgitimTuru { Online, YuzYuze, Karma }
+public enum DonemDurumu { Planlandi, Aktif, Tamamlandi, Iptal }
+public enum OdemeDurumu { Bekliyor, KismiOdeme, Tamamlandi, Iptal }

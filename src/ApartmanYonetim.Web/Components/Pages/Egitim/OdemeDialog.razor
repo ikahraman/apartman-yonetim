@@ -1,0 +1,33 @@
+@inject IEgitimService EgitimService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body1"><strong>@Kursiyer.FullName</strong></MudText>
+            <MudSelect @bind-Value="_durum" Label="Ödeme Durumu" Variant="Variant.Outlined">
+                <MudSelectItem Value="Domain.Enums.OdemeDurumu.Bekliyor">Bekliyor</MudSelectItem>
+                <MudSelectItem Value="Domain.Enums.OdemeDurumu.KismiOdeme">Kısmi Ödeme</MudSelectItem>
+                <MudSelectItem Value="Domain.Enums.OdemeDurumu.Tamamlandi">Tamamlandı</MudSelectItem>
+                <MudSelectItem Value="Domain.Enums.OdemeDurumu.Iptal">İptal</MudSelectItem>
+            </MudSelect>
+            <MudNumericField @bind-Value="_odenenTutar" Label="Ödenen Tutar (₺)" Variant="Variant.Outlined" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync">Kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public KursiyerDto Kursiyer { get; set; } = default!;
+    private Domain.Enums.OdemeDurumu _durum;
+    private decimal _odenenTutar;
+    protected override void OnParametersSet() { _durum = Kursiyer.OdemeDurumu; _odenenTutar = Kursiyer.OdenenTutar; }
+    private async Task SubmitAsync()
+    {
+        await EgitimService.UpdateOdemeAsync(Kursiyer.Id, _durum, _odenenTutar);
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+}

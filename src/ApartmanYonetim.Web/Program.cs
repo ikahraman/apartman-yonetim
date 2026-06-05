@@ -7,6 +7,7 @@ using ApartmanYonetim.Infrastructure.Persistence;
 using ApartmanYonetim.Infrastructure.Services;
 using ApartmanYonetim.Infrastructure.Tenant;
 using ApartmanYonetim.Application.Services;
+using ApartmanYonetim.Infrastructure.Services;
 using ApartmanYonetim.Web.Components;
 using ApartmanYonetim.Web.Identity;
 
@@ -111,6 +112,7 @@ builder.Services.AddScoped<IFirmStaffService, FirmStaffService>();
 builder.Services.AddScoped<IFirmDashboardService, FirmDashboardService>();
 builder.Services.AddScoped<ISiteObligationService, SiteObligationService>();
 builder.Services.AddScoped<IFirmContractService, FirmContractService>();
+builder.Services.AddScoped<IEgitimService, EgitimService>();
 
 var app = builder.Build();
 

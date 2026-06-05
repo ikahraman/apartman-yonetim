@@ -25,7 +25,7 @@ public static class DbSeeder
     {
         await db.Database.MigrateAsync();
 
-        foreach (var role in new[] { "SuperAdmin", "Manager", "SiteManager", "Auditor", "Accountant", "Resident" })
+        foreach (var role in new[] { "SuperAdmin", "Manager", "SiteManager", "Auditor", "Accountant", "Resident", "EgitimAdmin" })
             if (!await roleMgr.RoleExistsAsync(role))
                 await roleMgr.CreateAsync(new IdentityRole(role));
 
@@ -185,6 +185,7 @@ public static class DbSeeder
         }
 
         await SeedMissingObligations(db, firmFactory);
+        await SeedEgitimAsync(db, userManager);
     }
 
     private static async Task<FirmRegistration> EnsureAndSeedFirm(
@@ -885,6 +886,125 @@ public static class DbSeeder
             if (rnd.NextDouble() > 0.7)
                 db.AccountingEntries.Add(new SiteAccountingEntry { Type = AccountingEntryType.Income, Category = "Diğer Gelir", Amount = 500 + rnd.Next(200, 2000), Date = date.AddDays(rnd.Next(5, 25)), Description = $"{PeriodLabel(cy, cm)} otopark / reklam panosu geliri", CreatedBy = author });
             if (cm == 12) { cy++; cm = 1; } else cm++;
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedEgitimAsync(MainDbContext db, UserManager<AppUser> userManager)
+    {
+        if (await db.Egitimler.AnyAsync()) return;
+
+        await EnsureUser(userManager, "egitim@ay.com", "Egitim1234!", "Eğitim Koordinatörü", null, ["EgitimAdmin"]);
+
+        var egitim = new Domain.Entities.Egitim.Egitim
+        {
+            Ad = "Profesyonel Site Yöneticiliği Sertifika Programı",
+            Aciklama = "Kat Mülkiyeti Kanunu, aidat yönetimi, muhasebe, sakin iletişimi ve dijital yönetim araçlarını kapsayan kapsamlı sertifika programı. Programı başarıyla tamamlayan katılımcılara ApartNet onaylı sertifika verilmektedir.",
+            Hedefler = "• KMK hükümlerini eksiksiz uygulama\n• Aidat ve muhasebe yönetimini profesyonelce yürütme\n• Sakin ve mülk sahibi iletişimini etkin yönetme\n• Dijital apartman yönetim sistemlerini kullanma\n• Yasal uyuşmazlıklarda doğru adımları atma",
+            Gereksinimler = "Lise mezunu olmak, temel bilgisayar kullanımı, apartman veya site yönetimi alanında çalışmak veya çalışmayı planlamak.",
+            SertifikaAdi = "Profesyonel Site Yöneticisi Sertifikası",
+            IsActive = true
+        };
+        db.Egitimler.Add(egitim);
+        await db.SaveChangesAsync();
+
+        var baslangic = new DateOnly(2026, 7, 7);
+        var donem = new Domain.Entities.Egitim.EgitimDonemi
+        {
+            EgitimId = egitim.Id,
+            Ad = "2026 Yaz Dönemi — Temmuz Kohort",
+            BaslangicTarihi = baslangic,
+            BitisTarihi = new DateOnly(2026, 8, 1),
+            Kontenjan = 20,
+            Fiyat = 4500,
+            Tur = Domain.Enums.EgitimTuru.Karma,
+            Konum = "ApartNet Eğitim Merkezi, Çanakkale",
+            OnlinePlatform = "Zoom / ApartNet Portal",
+            Durum = Domain.Enums.DonemDurumu.Planlandi
+        };
+        db.EgitimDonemleri.Add(donem);
+        await db.SaveChangesAsync();
+
+        var dersler = new[]
+        {
+            (1,  "Site Yönetimine Giriş ve Mesleki Etik",               "Apartman ve site yönetiminin tanımı, yöneticinin hakları ve sorumlulukları, mesleki etik ilkeleri."),
+            (2,  "Kat Mülkiyeti Kanunu Temelleri",                       "634 sayılı KMK'nın temel hükümleri, kat irtifakı ve kat mülkiyeti farkı, önemli maddeler."),
+            (3,  "Yönetim Planı Hazırlama ve Uygulama",                  "Yönetim planının yasal dayanağı, içeriği, nasıl hazırlanacağı ve uygulanacağı."),
+            (4,  "Kat Malikleri Kurulu ve Toplantı Yönetimi",            "Olağan/olağanüstü toplantı çağrısı, nisap hesaplama, karar alma süreçleri, tutanak yazımı."),
+            (5,  "Aidat Hesaplama Yöntemleri",                           "Gider paylaşım esasları, arsa payı hesabı, aidat belirleme formülleri, özel gider kalemleri."),
+            (6,  "Aidat Tahsilatı ve İcra Takibi",                       "Borçlu kat malikine yasal yollar, icra süreci, gecikme zammı hesabı, pratik tahsilat yöntemleri."),
+            (7,  "Temel Muhasebe ve Gelir-Gider Kaydı",                  "Çift taraflı kayıt sistemi, gelir ve gider kalemleri, makbuz düzenleme, muhasebe programları."),
+            (8,  "Bütçe Planlaması ve Mali Raporlama",                   "Yıllık bütçe hazırlama, gerçekleşme takibi, kat maliklerine mali rapor sunumu."),
+            (9,  "Bakım-Onarım Yönetimi",                                "Periyodik bakım planı, acil onarım süreçleri, ihale ve sözleşme yapılması, iş takibi."),
+            (10, "Arıza Takip Sistemleri ve Kayıt Tutma",                "Arıza bildirim süreçleri, önceliklendirme, müteahhit yönetimi, dijital takip sistemleri."),
+            (11, "Sakin İletişimi ve Şikayet Yönetimi",                  "Etkili iletişim teknikleri, şikayet ele alma prosedürü, zor sakinlerle başa çıkma yöntemleri."),
+            (12, "Sigorta İşlemleri ve Risk Yönetimi",                   "Zorunlu deprem sigortası (DASK), bina sigortası türleri, hasar bildirimi, risk azaltma."),
+            (13, "Sözleşme Hazırlama ve Hizmet Alımı",                   "Temizlik, güvenlik, asansör, bahçe hizmet sözleşmeleri, sözleşmede bulunması gerekenler."),
+            (14, "İş Sağlığı, Güvenliği ve Mevzuat",                     "Bina çalışanlarının ISG yükümlülükleri, asansör güvenliği, yangın önlemleri, yasal gereklilikler."),
+            (15, "Vergi Yükümlülükleri ve Beyannameler",                 "Apartman yönetiminin vergi mükellefiyeti, muhtasar beyanname, SGK bildirimleri."),
+            (16, "Dijital Apartman Yönetim Sistemleri",                  "ApartNet ve benzer yazılımların kullanımı, dijital aidat takibi, online sakin iletişimi."),
+            (17, "Raporlama Teknikleri ve Arşivleme",                    "Aylık/yıllık rapor formatları, belge arşivleme sistemi, dijital depolama, kayıt saklama süreleri."),
+            (18, "Hukuki Uyuşmazlıklar ve Çözüm Yolları",               "Kat malikleri arası anlaşmazlıklar, sulh hukuk mahkemesi süreci, arabuluculuk, pratik örnekler."),
+            (19, "Personel Yönetimi ve İş Hukuku",                       "Kapıcı/görevli istihdamı, iş sözleşmesi, kıdem/ihbar tazminatı, disiplin prosedürleri."),
+            (20, "Vaka Analizleri, Sınav ve Sertifika Töreni",           "Gerçek vaka incelemeleri, yazılı sınav (70 puan geçer not), başarı belgesi ve sertifika takdimi.")
+        };
+
+        for (int i = 0; i < dersler.Length; i++)
+        {
+            var (sira, baslik, aciklama) = dersler[i];
+            int haftaOffset = i / 5;
+            int gunOffset = i % 5;
+            var dersTarihi = baslangic.ToDateTime(TimeOnly.Parse("09:30")).AddDays(haftaOffset * 7 + gunOffset);
+            db.DersProgramlari.Add(new Domain.Entities.Egitim.DersProgrami
+            {
+                DonemId = donem.Id,
+                SiraNo = sira,
+                Baslik = baslik,
+                Aciklama = aciklama,
+                DersTarihi = dersTarihi,
+                SureDakika = sira == 20 ? 180 : 90
+            });
+        }
+        await db.SaveChangesAsync();
+
+        var kursiyerVerisi = new[]
+        {
+            ("Ahmet",    "Yılmaz",    "ahmet.yilmaz@email.com",  "05321234567", "İstanbul",   "Apartman Yöneticisi",  4500m, Domain.Enums.OdemeDurumu.Tamamlandi),
+            ("Fatma",    "Kaya",      "fatma.kaya@email.com",    "05334567890", "Ankara",     "Muhasebeci",           4500m, Domain.Enums.OdemeDurumu.Tamamlandi),
+            ("Mehmet",   "Demir",     "mehmet.demir@email.com",  "05359876543", "İzmir",      "Site Görevlisi",       2250m, Domain.Enums.OdemeDurumu.KismiOdeme),
+            ("Ayşe",     "Çelik",     "ayse.celik@email.com",    "05443216789", "Bursa",      "Emlak Danışmanı",      4500m, Domain.Enums.OdemeDurumu.Tamamlandi),
+            ("Mustafa",  "Arslan",    "mustafa.arslan@email.com","05467891234", "Antalya",    "Apartman Yöneticisi",  4500m, Domain.Enums.OdemeDurumu.Tamamlandi),
+            ("Zeynep",   "Koç",       "zeynep.koc@email.com",    "05512345678", "Çanakkale",  "Öğrenci",              0m,    Domain.Enums.OdemeDurumu.Bekliyor),
+            ("Hasan",    "Şahin",     "hasan.sahin@email.com",   "05378901234", "Balıkesir",  "Site Yöneticisi",      4500m, Domain.Enums.OdemeDurumu.Tamamlandi),
+            ("Elif",     "Yıldız",    "elif.yildiz@email.com",   "05423456789", "Edirne",     "Muhasebeci",           4500m, Domain.Enums.OdemeDurumu.Tamamlandi),
+        };
+
+        var dersListesi = await db.DersProgramlari.Where(d => d.DonemId == donem.Id).OrderBy(d => d.SiraNo).ToListAsync();
+
+        foreach (var (ad, soyad, email, tel, sehir, meslek, odenen, odemeDurumu) in kursiyerVerisi)
+        {
+            var kursiyer = new Domain.Entities.Egitim.Kursiyer
+            {
+                DonemId = donem.Id,
+                Ad = ad, Soyad = soyad, Email = email, Telefon = tel,
+                Sehir = sehir, Meslek = meslek,
+                OdemeDurumu = odemeDurumu,
+                OdenenTutar = odenen,
+                KayitTarihi = new DateOnly(2026, 6, 15)
+            };
+            db.Kursiyerler.Add(kursiyer);
+            await db.SaveChangesAsync();
+
+            var rnd = new Random(kursiyer.Id);
+            foreach (var ders in dersListesi.Take(5))
+            {
+                db.DersTakipleri.Add(new Domain.Entities.Egitim.DersTakibi
+                {
+                    KursiyerId = kursiyer.Id,
+                    DersProgramiId = ders.Id,
+                    Katildi = odemeDurumu != Domain.Enums.OdemeDurumu.Bekliyor && rnd.NextDouble() > 0.15
+                });
+            }
         }
         await db.SaveChangesAsync();
     }

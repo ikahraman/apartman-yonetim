@@ -72,6 +72,14 @@
                 </MudNavLink>
             </AuthorizeView>
 
+            <!-- ══ EGİTİM ADMİN ════════════════════════════════ -->
+            <AuthorizeView Roles="EgitimAdmin,SuperAdmin" Context="_ea">
+                <NavSection Label="EĞİTİM" />
+                <MudNavLink Href="/egitim/admin" Icon="@Icons.Material.Filled.School" IconColor="Color.Secondary">
+                    Eğitim Yönetimi
+                </MudNavLink>
+            </AuthorizeView>
+
             <!-- ══ SUPERADMIN ══════════════════════════════════ -->
             <AuthorizeView Roles="SuperAdmin" Context="_a">
 

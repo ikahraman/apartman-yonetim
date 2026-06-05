@@ -1,0 +1,196 @@
+@page "/bilgi/egitim"
+@layout PublicLayout
+@inject IEgitimService EgitimService
+
+<PageTitle>Sertifikalı Eğitim — ApartNet</PageTitle>
+
+@if (_egitim is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* Hero *@
+    <MudPaper Elevation="0" Style="background:linear-gradient(135deg,#1565C0,#0D47A1);color:white;border-radius:16px;padding:48px 32px;margin-bottom:32px">
+        <MudStack AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.School" Style="font-size:4rem;opacity:0.9" />
+            <MudText Typo="Typo.h4" Style="font-weight:800;text-align:center">@_egitim.Ad</MudText>
+            <MudText Typo="Typo.body1" Style="opacity:0.9;text-align:center;max-width:600px">@_egitim.Aciklama</MudText>
+            @if (_aktifDonem is not null)
+            {
+                <MudStack Row="true" Spacing="2" Style="flex-wrap:wrap;justify-content:center;margin-top:8px">
+                    <MudChip T="string" Icon="@Icons.Material.Filled.CalendarMonth" Style="background:rgba(255,255,255,0.2);color:white">
+                        @_aktifDonem.BaslangicTarihi.ToString("dd MMM yyyy", _tr) – @_aktifDonem.BitisTarihi.ToString("dd MMM yyyy", _tr)
+                    </MudChip>
+                    <MudChip T="string" Icon="@Icons.Material.Filled.People" Style="background:rgba(255,255,255,0.2);color:white">
+                        @_aktifDonem.KursiyerSayisi / @_aktifDonem.Kontenjan Kontenjan
+                    </MudChip>
+                    <MudChip T="string" Icon="@Icons.Material.Filled.AttachMoney" Style="background:rgba(255,255,255,0.2);color:white">
+                        @_aktifDonem.Fiyat.ToString("N0") ₺
+                    </MudChip>
+                    <MudChip T="string" Icon="@Icons.Material.Filled.LocationOn" Style="background:rgba(255,255,255,0.2);color:white">
+                        @TurLabel(_aktifDonem.Tur)
+                    </MudChip>
+                </MudStack>
+            }
+        </MudStack>
+    </MudPaper>
+
+    <MudGrid Spacing="4">
+        @* Sol: Program içeriği *@
+        <MudItem xs="12" md="8">
+
+            @* Hedefler *@
+            @if (_egitim.Hedefler is not null)
+            {
+                <MudPaper Elevation="1" Class="pa-4 mb-4" Style="border-radius:12px">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.TrackChanges" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Öğrenme Hedefleri</MudText>
+                    </MudStack>
+                    @foreach (var hedef in _egitim.Hedefler.Split('\n').Where(h => h.Trim().Length > 0))
+                    {
+                        <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Class="mb-1">
+                            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                            <MudText Typo="Typo.body2">@hedef.TrimStart('•').Trim()</MudText>
+                        </MudStack>
+                    }
+                </MudPaper>
+            }
+
+            @* Ders Programı *@
+            @if (_dersler.Count > 0)
+            {
+                <MudPaper Elevation="1" Class="pa-4 mb-4" Style="border-radius:12px">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.MenuBook" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Ders Programı (@_dersler.Count Ders)</MudText>
+                    </MudStack>
+
+                    @foreach (var hafta in _dersler.GroupBy(d => (d.SiraNo - 1) / 5 + 1).OrderBy(g => g.Key))
+                    {
+                        <MudText Typo="Typo.subtitle2" Style="font-weight:700;margin-top:16px;margin-bottom:8px;color:#1565C0">
+                            @hafta.Key. Hafta
+                        </MudText>
+                        @foreach (var ders in hafta.OrderBy(d => d.SiraNo))
+                        {
+                            <MudPaper Outlined="true" Class="pa-3 mb-2" Style="border-radius:8px">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudAvatar Size="Size.Small" Color="Color.Primary" Style="font-size:0.75rem;width:28px;height:28px">@ders.SiraNo</MudAvatar>
+                                    <MudStack Spacing="0" Style="flex:1">
+                                        <MudText Typo="Typo.body2" Style="font-weight:600">@ders.Baslik</MudText>
+                                        @if (ders.Aciklama is not null)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@ders.Aciklama</MudText>
+                                        }
+                                    </MudStack>
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                        @ders.DersTarihi.ToString("dd MMM", _tr) · @ders.SureDakika dk
+                                    </MudChip>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    }
+                </MudPaper>
+            }
+
+            @* Gereksinimler *@
+            @if (_egitim.Gereksinimler is not null)
+            {
+                <MudPaper Elevation="1" Class="pa-4" Style="border-radius:12px">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Info" />
+                        <MudText Typo="Typo.h6" Style="font-weight:700">Ön Koşullar</MudText>
+                    </MudStack>
+                    <MudText Typo="Typo.body2">@_egitim.Gereksinimler</MudText>
+                </MudPaper>
+            }
+        </MudItem>
+
+        @* Sağ: Kayıt kartı *@
+        <MudItem xs="12" md="4">
+            @if (_aktifDonem is not null)
+            {
+                <MudPaper Elevation="3" Class="pa-4" Style="border-radius:12px;position:sticky;top:80px">
+                    <MudText Typo="Typo.h5" Style="font-weight:800;color:#1565C0">@_aktifDonem.Fiyat.ToString("N0") ₺</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">Erken kayıt fiyatı — KDV dahil</MudText>
+
+                    <MudDivider Class="mb-3" />
+
+                    <MudStack Spacing="2" Class="mb-4">
+                        <MudStack Row="true" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2"><strong>Dönem:</strong> @_aktifDonem.Ad</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.DateRange" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2">@_aktifDonem.BaslangicTarihi.ToString("dd MMM", _tr) – @_aktifDonem.BitisTarihi.ToString("dd MMM yyyy", _tr)</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2">Pazartesi–Cuma, 09:30–11:00</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.VideoCall" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2">@TurLabel(_aktifDonem.Tur)</MudText>
+                        </MudStack>
+                        @if (_aktifDonem.Konum is not null)
+                        {
+                            <MudStack Row="true" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Color="Color.Primary" />
+                                <MudText Typo="Typo.body2">@_aktifDonem.Konum</MudText>
+                            </MudStack>
+                        }
+                        <MudStack Row="true" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2">@(_aktifDonem.Kontenjan - _aktifDonem.KursiyerSayisi) kontenjan kaldı</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1">
+                            <MudIcon Icon="@Icons.Material.Filled.WorkspacePremium" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2">@_egitim.SertifikaAdi</MudText>
+                        </MudStack>
+                    </MudStack>
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large"
+                               Href="mailto:egitim@apartnet.com.tr?subject=Sertifika Programı Kayıt Talebi"
+                               StartIcon="@Icons.Material.Filled.HowToReg">
+                        Kayıt Ol
+                    </MudButton>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2" Style="text-align:center;display:block">
+                        egitim@apartnet.com.tr
+                    </MudText>
+                </MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private EgitimDto? _egitim;
+    private EgitimDonemDto? _aktifDonem;
+    private List<DersProgramiDto> _dersler = [];
+    private static readonly System.Globalization.CultureInfo _tr = new("tr-TR");
+
+    protected override async Task OnInitializedAsync()
+    {
+        var egitimler = await EgitimService.GetEgitimlerAsync();
+        _egitim = egitimler.FirstOrDefault();
+        if (_egitim is null) return;
+
+        var donemler = await EgitimService.GetDonemleriAsync(_egitim.Id);
+        _aktifDonem = donemler.FirstOrDefault(d => d.Durum == Domain.Enums.DonemDurumu.Aktif)
+                   ?? donemler.FirstOrDefault(d => d.Durum == Domain.Enums.DonemDurumu.Planlandi)
+                   ?? donemler.FirstOrDefault();
+
+        if (_aktifDonem is not null)
+            _dersler = await EgitimService.GetDersProgramiAsync(_aktifDonem.Id);
+    }
+
+    private static string TurLabel(Domain.Enums.EgitimTuru t) => t switch
+    {
+        Domain.Enums.EgitimTuru.Online => "Online (Zoom)",
+        Domain.Enums.EgitimTuru.YuzYuze => "Yüz Yüze",
+        Domain.Enums.EgitimTuru.Karma => "Karma (Online + Yüz Yüze)",
+        _ => ""
+    };
+}

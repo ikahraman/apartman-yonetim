@@ -1,0 +1,54 @@
+@inject IEgitimService EgitimService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudGrid>
+                <MudItem xs="6"><MudTextField @bind-Value="_ad" Label="Ad" Required="true" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="6"><MudTextField @bind-Value="_soyad" Label="Soyad" Required="true" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <MudTextField @bind-Value="_email" Label="E-posta" Required="true" Variant="Variant.Outlined" InputType="InputType.Email" />
+            <MudTextField @bind-Value="_telefon" Label="Telefon" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_sehir" Label="Şehir" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_meslek" Label="Meslek" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_notlar" Label="Notlar" Variant="Variant.Outlined" Lines="2" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">Kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int DonemId { get; set; }
+    [Parameter] public KursiyerDto? Kursiyer { get; set; }
+
+    private string _ad = "", _soyad = "", _email = "";
+    private string? _telefon, _sehir, _meslek, _notlar, _error;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Kursiyer is not null)
+        { _ad = Kursiyer.Ad; _soyad = Kursiyer.Soyad; _email = Kursiyer.Email; _telefon = Kursiyer.Telefon; _sehir = Kursiyer.Sehir; _meslek = Kursiyer.Meslek; _notlar = Kursiyer.Notlar; }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_ad) || string.IsNullOrWhiteSpace(_soyad) || string.IsNullOrWhiteSpace(_email))
+        { _error = "Ad, soyad ve e-posta zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var cmd = new KursiyerKayitCommand(_ad.Trim(), _soyad.Trim(), _email.Trim(), _telefon, _sehir, _meslek, _notlar);
+            if (Kursiyer is null) await EgitimService.AddKursiyerAsync(DonemId, cmd);
+            else await EgitimService.UpdateKursiyerAsync(Kursiyer.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

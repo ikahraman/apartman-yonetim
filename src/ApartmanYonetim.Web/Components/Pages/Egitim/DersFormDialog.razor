@@ -1,0 +1,62 @@
+@inject IEgitimService EgitimService
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_baslik" Label="Ders Başlığı" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_aciklama" Label="Açıklama" Variant="Variant.Outlined" Lines="2" />
+            <MudDatePicker @bind-Date="_dersTarihi" Label="Ders Tarihi" Variant="Variant.Outlined" DateFormat="dd.MM.yyyy" />
+            <MudTimePicker @bind-Time="_dersZamani" Label="Saat" Variant="Variant.Outlined" />
+            <MudNumericField @bind-Value="_sureDakika" Label="Süre (dakika)" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_icerikLink" Label="İçerik Linki" Variant="Variant.Outlined" Placeholder="https://" />
+            <MudTextField @bind-Value="_videoLink" Label="Video Linki" Variant="Variant.Outlined" Placeholder="https://youtube.com/..." />
+            <MudTextField @bind-Value="_icerikMetin" Label="Ders Notları" Variant="Variant.Outlined" Lines="3" />
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Cancel())">İptal</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SubmitAsync" Disabled="_busy">Kaydet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int DonemId { get; set; }
+    [Parameter] public DersProgramiDto? Ders { get; set; }
+
+    private string _baslik = "";
+    private string? _aciklama, _icerikLink, _videoLink, _icerikMetin, _error;
+    private DateTime? _dersTarihi = DateTime.Today;
+    private TimeSpan? _dersZamani = new TimeSpan(9, 30, 0);
+    private int _sureDakika = 90;
+    private bool _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Ders is not null)
+        {
+            _baslik = Ders.Baslik; _aciklama = Ders.Aciklama;
+            _dersTarihi = Ders.DersTarihi.Date;
+            _dersZamani = Ders.DersTarihi.TimeOfDay;
+            _sureDakika = Ders.SureDakika;
+            _icerikLink = Ders.IcerikLink; _videoLink = Ders.VideoLink; _icerikMetin = Ders.IcerikMetin;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_baslik)) { _error = "Başlık zorunludur."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            var tarih = (_dersTarihi ?? DateTime.Today).Date + (_dersZamani ?? TimeSpan.Zero);
+            var cmd = new DersProgramiCommand(_baslik.Trim(), _aciklama, tarih, _sureDakika, _icerikMetin, _icerikLink, _videoLink);
+            if (Ders is null) await EgitimService.AddDersAsync(DonemId, cmd);
+            else await EgitimService.UpdateDersAsync(Ders.Id, cmd);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

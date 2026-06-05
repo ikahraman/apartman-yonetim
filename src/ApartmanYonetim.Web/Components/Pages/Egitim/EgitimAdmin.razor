@@ -1,0 +1,367 @@
+@page "/egitim/admin"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SuperAdmin,EgitimAdmin")]
+@inject IEgitimService EgitimService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Eğitim Yönetimi</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.School" Color="Color.Primary" Style="font-size:2rem" />
+        <MudText Typo="Typo.h5" Style="font-weight:700">Eğitim Yönetimi</MudText>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_egitim is null)
+    {
+        <MudAlert Severity="Severity.Info">Henüz eğitim tanımlanmamış.</MudAlert>
+    }
+    else
+    {
+        @* Eğitim başlığı *@
+        <MudPaper Elevation="1" Class="pa-4 mb-4" Style="border-radius:12px;border-left:4px solid #1565C0">
+            <MudText Typo="Typo.h6" Style="font-weight:700">@_egitim.Ad</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@_egitim.SertifikaAdi</MudText>
+        </MudPaper>
+
+        @* Dönem seçici *@
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mb-4" Wrap="Wrap.Wrap">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:600">Dönem:</MudText>
+            @foreach (var d in _donemler)
+            {
+                var donem = d;
+                <MudChip T="string" Color="@(_seciliDonemId == donem.Id ? Color.Primary : Color.Default)"
+                         OnClick="@(() => SelectDonem(donem.Id))"
+                         Style="cursor:pointer">
+                    @donem.Ad
+                    <MudChip T="string" Size="Size.Small" Color="@DurumColor(donem.Durum)" Style="margin-left:4px;height:18px">@DurumLabel(donem.Durum)</MudChip>
+                </MudChip>
+            }
+        </MudStack>
+
+        @if (_secilenDonem is not null)
+        {
+            @* Dönem özet *@
+            <MudGrid Spacing="3" Class="mb-4">
+                <MudItem xs="6" sm="3">
+                    <MudPaper Elevation="1" Class="pa-3 text-center" Style="border-radius:8px">
+                        <MudText Typo="Typo.h5" Style="font-weight:700;color:#1565C0">@_kursiyerler.Count</MudText>
+                        <MudText Typo="Typo.caption">Kursiyer</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Elevation="1" Class="pa-3 text-center" Style="border-radius:8px">
+                        <MudText Typo="Typo.h5" Style="font-weight:700;color:#2E7D32">@_kursiyerler.Count(k => k.OdemeDurumu == Domain.Enums.OdemeDurumu.Tamamlandi)</MudText>
+                        <MudText Typo="Typo.caption">Ödeme Tamam</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Elevation="1" Class="pa-3 text-center" Style="border-radius:8px">
+                        <MudText Typo="Typo.h5" Style="font-weight:700;color:#F57C00">@_dersler.Count</MudText>
+                        <MudText Typo="Typo.caption">Ders</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="3">
+                    <MudPaper Elevation="1" Class="pa-3 text-center" Style="border-radius:8px">
+                        <MudText Typo="Typo.h5" Style="font-weight:700;color:#6A1B9A">@_kursiyerler.Count(k => k.SertifikaVerildi)</MudText>
+                        <MudText Typo="Typo.caption">Sertifika</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+
+            @* Sekmeler *@
+            <MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true" Class="mb-4">
+
+                @* Kursiyerler *@
+                <MudTabPanel Text="Kursiyerler" Icon="@Icons.Material.Filled.People">
+                    <MudStack Row="true" Spacing="2" Class="my-3" Justify="Justify.FlexEnd">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+                                   OnClick="AddKursiyer">Kursiyer Ekle</MudButton>
+                    </MudStack>
+                    <MudTable T="KursiyerDto" Items="_kursiyerler" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Ad Soyad</MudTh>
+                            <MudTh>E-posta</MudTh>
+                            <MudTh>Meslek</MudTh>
+                            <MudTh>Şehir</MudTh>
+                            <MudTh>Ödeme</MudTh>
+                            <MudTh>Katılım</MudTh>
+                            <MudTh>Sertifika</MudTh>
+                            <MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd><MudText Style="font-weight:500">@context.FullName</MudText></MudTd>
+                            <MudTd>@context.Email</MudTd>
+                            <MudTd>@(context.Meslek ?? "—")</MudTd>
+                            <MudTd>@(context.Sehir ?? "—")</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Size="Size.Small" Color="@OdemeColor(context.OdemeDurumu)">
+                                    @OdemeLabel(context.OdemeDurumu)
+                                </MudChip>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@context.OdenenTutar.ToString("N0") ₺</MudText>
+                            </MudTd>
+                            <MudTd>@context.KatilimSayisi / @context.ToplamDers ders</MudTd>
+                            <MudTd>
+                                @if (context.SertifikaVerildi)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.WorkspacePremium">
+                                        @context.SertifikaNo
+                                    </MudChip>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                                }
+                            </MudTd>
+                            <MudTd>
+                                <MudStack Row="true" Spacing="0">
+                                    <MudTooltip Text="Düzenle">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="() => EditKursiyer(context)" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Ödeme güncelle">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Payment" Size="Size.Small" Color="Color.Info" OnClick="() => UpdateOdeme(context)" />
+                                    </MudTooltip>
+                                    @if (!context.SertifikaVerildi && context.OdemeDurumu == Domain.Enums.OdemeDurumu.Tamamlandi)
+                                    {
+                                        <MudTooltip Text="Sertifika ver">
+                                            <MudIconButton Icon="@Icons.Material.Filled.WorkspacePremium" Size="Size.Small" Color="Color.Success" OnClick="() => SertifikaVer(context)" />
+                                        </MudTooltip>
+                                    }
+                                </MudStack>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudTabPanel>
+
+                @* Ders Programı *@
+                <MudTabPanel Text="Ders Programı" Icon="@Icons.Material.Filled.MenuBook">
+                    <MudStack Row="true" Spacing="2" Class="my-3" Justify="Justify.FlexEnd">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddDers">Ders Ekle</MudButton>
+                    </MudStack>
+                    <MudTable T="DersProgramiDto" Items="_dersler" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>#</MudTh>
+                            <MudTh>Başlık</MudTh>
+                            <MudTh>Tarih / Saat</MudTh>
+                            <MudTh>Süre</MudTh>
+                            <MudTh>Katılım</MudTh>
+                            <MudTh>İçerik</MudTh>
+                            <MudTh></MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd><MudChip T="string" Size="Size.Small" Color="Color.Primary">@context.SiraNo</MudChip></MudTd>
+                            <MudTd><MudText Style="font-weight:500">@context.Baslik</MudText></MudTd>
+                            <MudTd>@context.DersTarihi.ToString("dd MMM yyyy, HH:mm", _tr)</MudTd>
+                            <MudTd>@context.SureDakika dk</MudTd>
+                            <MudTd>@context.KatilimSayisi katılımcı</MudTd>
+                            <MudTd>
+                                @if (context.IcerikLink is not null || context.VideoLink is not null)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Link" Size="Size.Small" Color="Color.Success" />
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                                }
+                            </MudTd>
+                            <MudTd>
+                                <MudTooltip Text="Düzenle">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="() => EditDers(context)" />
+                                </MudTooltip>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudTabPanel>
+
+                @* Devam Takibi *@
+                <MudTabPanel Text="Devam Takibi" Icon="@Icons.Material.Filled.HowToReg">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="my-3">
+                        Her kursiyer için ders bazında katılım durumu. Tıklayarak güncellenir.
+                    </MudText>
+                    <div Style="overflow-x:auto">
+                        <table style="border-collapse:collapse;min-width:100%">
+                            <thead>
+                                <tr>
+                                    <th style="padding:8px;text-align:left;white-space:nowrap;font-weight:600;border-bottom:2px solid #e0e0e0">Kursiyer</th>
+                                    @foreach (var ders in _dersler.Take(10))
+                                    {
+                                        <th style="padding:4px 8px;text-align:center;font-size:0.75rem;border-bottom:2px solid #e0e0e0;max-width:60px">
+                                            <MudTooltip Text="@ders.Baslik">
+                                                <span>D@ders.SiraNo</span>
+                                            </MudTooltip>
+                                        </th>
+                                    }
+                                    <th style="padding:8px;text-align:center;border-bottom:2px solid #e0e0e0">%</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var k in _kursiyerler)
+                                {
+                                    var kursiyer = k;
+                                    <tr>
+                                        <td style="padding:6px 8px;white-space:nowrap;border-bottom:1px solid #f0f0f0">
+                                            <MudText Typo="Typo.body2" Style="font-weight:500">@kursiyer.FullName</MudText>
+                                        </td>
+                                        @foreach (var ders in _dersler.Take(10))
+                                        {
+                                            var d = ders;
+                                            var katildi = _takipler.FirstOrDefault(t => t.KursiyerId == kursiyer.Id && t.DersProgramiId == d.Id)?.Katildi ?? false;
+                                            <td style="padding:4px;text-align:center;border-bottom:1px solid #f0f0f0">
+                                                <MudIconButton Icon="@(katildi ? Icons.Material.Filled.CheckCircle : Icons.Material.Outlined.Circle)"
+                                                               Color="@(katildi ? Color.Success : Color.Default)"
+                                                               Size="Size.Small"
+                                                               OnClick="() => ToggleKatilim(kursiyer.Id, d.Id, katildi)" />
+                                            </td>
+                                        }
+                                        <td style="padding:6px 8px;text-align:center;border-bottom:1px solid #f0f0f0">
+                                            <MudText Typo="Typo.caption" Style="font-weight:600">
+                                                @(kursiyer.ToplamDers > 0 ? $"%{kursiyer.KatilimSayisi * 100 / Math.Max(kursiyer.ToplamDers,1)}" : "—")
+                                            </MudText>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </MudTabPanel>
+
+                @* Dönem Ayarları *@
+                <MudTabPanel Text="Dönem Ayarları" Icon="@Icons.Material.Filled.Settings">
+                    <MudStack Spacing="3" Class="my-3" Style="max-width:500px">
+                        <MudTextField @bind-Value="_donemAd" Label="Dönem Adı" Variant="Variant.Outlined" />
+                        <MudNumericField @bind-Value="_donemFiyat" Label="Fiyat (₺)" Variant="Variant.Outlined" />
+                        <MudNumericField @bind-Value="_donemKontenjan" Label="Kontenjan" Variant="Variant.Outlined" />
+                        <MudSelect @bind-Value="_donemDurum" Label="Durum" Variant="Variant.Outlined">
+                            <MudSelectItem Value="Domain.Enums.DonemDurumu.Planlandi">Planlandı</MudSelectItem>
+                            <MudSelectItem Value="Domain.Enums.DonemDurumu.Aktif">Aktif</MudSelectItem>
+                            <MudSelectItem Value="Domain.Enums.DonemDurumu.Tamamlandi">Tamamlandı</MudSelectItem>
+                            <MudSelectItem Value="Domain.Enums.DonemDurumu.Iptal">İptal</MudSelectItem>
+                        </MudSelect>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveDonem">Kaydet</MudButton>
+                    </MudStack>
+                </MudTabPanel>
+            </MudTabs>
+        }
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private EgitimDto? _egitim;
+    private List<EgitimDonemDto> _donemler = [];
+    private int _seciliDonemId;
+    private EgitimDonemDto? _secilenDonem;
+    private List<DersProgramiDto> _dersler = [];
+    private List<KursiyerDto> _kursiyerler = [];
+    private List<DersTakibiDto> _takipler = [];
+    private static readonly System.Globalization.CultureInfo _tr = new("tr-TR");
+
+    // Dönem ayar alanları
+    private string _donemAd = "";
+    private decimal _donemFiyat;
+    private int _donemKontenjan;
+    private Domain.Enums.DonemDurumu _donemDurum;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var egitimler = await EgitimService.GetEgitimlerAsync();
+        _egitim = egitimler.FirstOrDefault();
+        if (_egitim is not null)
+        {
+            _donemler = await EgitimService.GetDonemleriAsync(_egitim.Id);
+            if (_donemler.Count > 0)
+                await SelectDonem(_donemler.First().Id);
+        }
+        _loading = false;
+    }
+
+    private async Task SelectDonem(int donemId)
+    {
+        _seciliDonemId = donemId;
+        _secilenDonem = _donemler.First(d => d.Id == donemId);
+        _donemAd = _secilenDonem.Ad;
+        _donemFiyat = _secilenDonem.Fiyat;
+        _donemKontenjan = _secilenDonem.Kontenjan;
+        _donemDurum = _secilenDonem.Durum;
+        _dersler = await EgitimService.GetDersProgramiAsync(donemId);
+        _kursiyerler = await EgitimService.GetKursiyerlerAsync(donemId);
+        _takipler = await EgitimService.GetTakiplerAsync(donemId);
+    }
+
+    private async Task Reload() => await SelectDonem(_seciliDonemId);
+
+    private async Task AddKursiyer()
+    {
+        var p = new DialogParameters<KursiyerFormDialog> { { x => x.DonemId, _seciliDonemId } };
+        var d = await DialogService.ShowAsync<KursiyerFormDialog>("Kursiyer Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await d.Result)!.Canceled) await Reload();
+    }
+
+    private async Task EditKursiyer(KursiyerDto k)
+    {
+        var p = new DialogParameters<KursiyerFormDialog> { { x => x.DonemId, _seciliDonemId }, { x => x.Kursiyer, k } };
+        var d = await DialogService.ShowAsync<KursiyerFormDialog>("Kursiyer Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await d.Result)!.Canceled) await Reload();
+    }
+
+    private async Task UpdateOdeme(KursiyerDto k)
+    {
+        var p = new DialogParameters<OdemeDialog> { { x => x.Kursiyer, k } };
+        var d = await DialogService.ShowAsync<OdemeDialog>("Ödeme Güncelle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await d.Result)!.Canceled) await Reload();
+    }
+
+    private async Task SertifikaVer(KursiyerDto k)
+    {
+        await EgitimService.SertifikaVerAsync(k.Id);
+        Snackbar.Add($"{k.FullName} için sertifika oluşturuldu.", Severity.Success);
+        await Reload();
+    }
+
+    private async Task AddDers()
+    {
+        var p = new DialogParameters<DersFormDialog> { { x => x.DonemId, _seciliDonemId } };
+        var d = await DialogService.ShowAsync<DersFormDialog>("Ders Ekle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await d.Result)!.Canceled) await Reload();
+    }
+
+    private async Task EditDers(DersProgramiDto ders)
+    {
+        var p = new DialogParameters<DersFormDialog> { { x => x.DonemId, _seciliDonemId }, { x => x.Ders, ders } };
+        var d = await DialogService.ShowAsync<DersFormDialog>("Ders Düzenle", p, new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if (!(await d.Result)!.Canceled) await Reload();
+    }
+
+    private async Task ToggleKatilim(int kursiyerId, int dersId, bool mevcutDurum)
+    {
+        await EgitimService.SetKatilimAsync(kursiyerId, dersId, !mevcutDurum);
+        _takipler = await EgitimService.GetTakiplerAsync(_seciliDonemId);
+        _kursiyerler = await EgitimService.GetKursiyerlerAsync(_seciliDonemId);
+    }
+
+    private async Task SaveDonem()
+    {
+        if (_secilenDonem is null) return;
+        var cmd = new DonemCommand(_donemAd, _secilenDonem.BaslangicTarihi, _secilenDonem.BitisTarihi,
+            _donemKontenjan, _donemFiyat, _secilenDonem.Tur, _secilenDonem.Konum, _secilenDonem.OnlinePlatform, _donemDurum);
+        await EgitimService.UpdateDonemAsync(_seciliDonemId, cmd);
+        _donemler = await EgitimService.GetDonemleriAsync(_egitim!.Id);
+        _secilenDonem = _donemler.First(d => d.Id == _seciliDonemId);
+        Snackbar.Add("Dönem güncellendi.", Severity.Success);
+    }
+
+    private static Color DurumColor(Domain.Enums.DonemDurumu d) => d switch
+    { Domain.Enums.DonemDurumu.Aktif => Color.Success, Domain.Enums.DonemDurumu.Tamamlandi => Color.Info, Domain.Enums.DonemDurumu.Iptal => Color.Error, _ => Color.Warning };
+    private static string DurumLabel(Domain.Enums.DonemDurumu d) => d switch
+    { Domain.Enums.DonemDurumu.Aktif => "Aktif", Domain.Enums.DonemDurumu.Tamamlandi => "Tamamlandı", Domain.Enums.DonemDurumu.Iptal => "İptal", _ => "Planlandı" };
+    private static Color OdemeColor(Domain.Enums.OdemeDurumu d) => d switch
+    { Domain.Enums.OdemeDurumu.Tamamlandi => Color.Success, Domain.Enums.OdemeDurumu.KismiOdeme => Color.Warning, Domain.Enums.OdemeDurumu.Iptal => Color.Error, _ => Color.Default };
+    private static string OdemeLabel(Domain.Enums.OdemeDurumu d) => d switch
+    { Domain.Enums.OdemeDurumu.Tamamlandi => "Ödendi", Domain.Enums.OdemeDurumu.KismiOdeme => "Kısmi", Domain.Enums.OdemeDurumu.Iptal => "İptal", _ => "Bekliyor" };
+}

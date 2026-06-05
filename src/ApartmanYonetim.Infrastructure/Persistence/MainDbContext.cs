@@ -1,4 +1,5 @@
 using ApartmanYonetim.Domain.Entities;
+using ApartmanYonetim.Domain.Entities.Egitim;
 using ApartmanYonetim.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,13 @@ public class MainDbContext(DbContextOptions<MainDbContext> options) : IdentityDb
     public DbSet<SiteObligation> SiteObligations => Set<SiteObligation>();
     public DbSet<SiteObligationPayment> SiteObligationPayments => Set<SiteObligationPayment>();
     public DbSet<SystemAuditLog> SystemAuditLogs => Set<SystemAuditLog>();
+
+    // Eğitim modülü
+    public DbSet<Egitim> Egitimler => Set<Egitim>();
+    public DbSet<EgitimDonemi> EgitimDonemleri => Set<EgitimDonemi>();
+    public DbSet<DersProgrami> DersProgramlari => Set<DersProgrami>();
+    public DbSet<Kursiyer> Kursiyerler => Set<Kursiyer>();
+    public DbSet<DersTakibi> DersTakipleri => Set<DersTakibi>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -100,6 +108,46 @@ public class MainDbContext(DbContextOptions<MainDbContext> options) : IdentityDb
             b.Property(p => p.AmountPaid).HasColumnType("decimal(10,2)");
             b.Property(p => p.Notes).HasMaxLength(1000);
             b.Property(p => p.RecordedBy).HasMaxLength(200);
+        });
+
+        builder.Entity<Egitim>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.Property(e => e.Ad).HasMaxLength(300).IsRequired();
+        });
+
+        builder.Entity<EgitimDonemi>(b =>
+        {
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Ad).HasMaxLength(200).IsRequired();
+            b.Property(d => d.Fiyat).HasColumnType("decimal(10,2)");
+            b.HasOne(d => d.Egitim).WithMany(e => e.Donemler).HasForeignKey(d => d.EgitimId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<DersProgrami>(b =>
+        {
+            b.HasKey(d => d.Id);
+            b.Property(d => d.Baslik).HasMaxLength(300).IsRequired();
+            b.HasOne(d => d.Donem).WithMany(dn => dn.DersProgramlari).HasForeignKey(d => d.DonemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Kursiyer>(b =>
+        {
+            b.HasKey(k => k.Id);
+            b.Property(k => k.Ad).HasMaxLength(100).IsRequired();
+            b.Property(k => k.Soyad).HasMaxLength(100).IsRequired();
+            b.Property(k => k.Email).HasMaxLength(256).IsRequired();
+            b.Property(k => k.OdenenTutar).HasColumnType("decimal(10,2)");
+            b.Ignore(k => k.FullName);
+            b.HasOne(k => k.Donem).WithMany(d => d.Kursiyerler).HasForeignKey(k => k.DonemId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<DersTakibi>(b =>
+        {
+            b.HasKey(t => t.Id);
+            b.HasIndex(t => new { t.KursiyerId, t.DersProgramiId }).IsUnique();
+            b.HasOne(t => t.Kursiyer).WithMany(k => k.Takipler).HasForeignKey(t => t.KursiyerId).OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(t => t.DersProgrami).WithMany(d => d.Takipler).HasForeignKey(t => t.DersProgramiId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
