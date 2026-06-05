@@ -55,6 +55,7 @@ public static class DbSeeder
         if (await db.FirmRegistrations.AnyAsync())
         {
             await MigrateExistingFirmDbsAsync(db, firmFactory);
+            await MigrateExistingSiteDbsAsync(db, firmFactory, siteFactory);
             await SeedMissingSubscriptions(db);
             await SeedMissingObligations(db, firmFactory);
             await SeedMissingStaffDataAsync(db, userManager, firmFactory);
@@ -528,6 +529,29 @@ public static class DbSeeder
                 await firmDb.Database.MigrateAsync();
             }
             catch { /* firma DB yoksa veya erişilemiyorsa atla */ }
+        }
+    }
+
+    private static async Task MigrateExistingSiteDbsAsync(MainDbContext db, FirmDbContextFactory firmFactory, SiteDbContextFactory siteFactory)
+    {
+        var firms = await db.FirmRegistrations.ToListAsync();
+        foreach (var firm in firms)
+        {
+            try
+            {
+                await using var firmDb = firmFactory.CreateBySlug(firm.Slug);
+                var sites = await firmDb.Sites.ToListAsync();
+                foreach (var site in sites)
+                {
+                    try
+                    {
+                        await using var siteDb = siteFactory.Create(site.DbFilePath);
+                        await siteDb.Database.MigrateAsync();
+                    }
+                    catch { /* site DB yoksa veya erişilemiyorsa atla */ }
+                }
+            }
+            catch { /* firma DB yoksa atla */ }
         }
     }
 
