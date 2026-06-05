@@ -1,5 +1,5 @@
 @page "/site/{SiteId:guid}/arizalar"
-@rendermode InteractiveServer
+
 @attribute [Authorize(Roles = "SuperAdmin,FirmAdmin,SiteManager,Auditor")]
 @inject ISiteManagementService SiteService
 @inject ISiteMaintenanceService MaintenanceService

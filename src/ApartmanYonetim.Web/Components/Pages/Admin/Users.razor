@@ -1,5 +1,5 @@
 @page "/admin/kullanicilar"
-@rendermode InteractiveServer
+
 @attribute [Authorize(Roles = "SuperAdmin")]
 @inject UserManager<AppUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
