@@ -1,4 +1,5 @@
 @page "/site/{SiteId:guid}/sakinler"
+@rendermode InteractiveServer
 @attribute [Authorize(Roles = "SuperAdmin,Manager,SiteManager,Auditor")]
 @inject ISiteManagementService SiteService
 @inject ISiteResidentService ResidentService
