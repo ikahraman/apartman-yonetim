@@ -1,6 +1,6 @@
 @page "/site/{SiteId:guid}/aidatlar"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = "SuperAdmin,Manager,SiteManager,Auditor")]
+@attribute [Authorize(Roles = "SuperAdmin,FirmAdmin,SiteManager,Auditor")]
 @inject ISiteManagementService SiteService
 @inject ISiteFeeService FeeService
 @inject ISiteReportService ReportService
