@@ -129,17 +129,8 @@
                         <MudCardActions>
                             <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                                        StartIcon="@Icons.Material.Filled.ManageAccounts"
-                                       Disabled="@(_loadingSiteId == s.Id)"
-                                       OnClick="@(() => GoToSite(s.Id))">
-                                @if (_loadingSiteId == s.Id)
-                                {
-                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
-                                    <span>Yükleniyor...</span>
-                                }
-                                else
-                                {
-                                    <span>Yönet</span>
-                                }
+                                       Href="@($"/site/{s.Id}/ozet")">
+                                Yönet
                             </MudButton>
                             @if (_isManager && s.SiteType != SiteType.Apartman)
                             {
